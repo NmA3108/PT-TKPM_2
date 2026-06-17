@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "493474573518",
+    "firebase_url": "https://tmdt-e5958-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "tmdt-e5958",
+    "storage_bucket": "tmdt-e5958.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:493474573518:android:15160f60a9c2f102d1349f",
+        "android_client_info": {
+          "package_name": "do.app.tmdt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQLsmAadH3f159YIcr4GYv4y7aArehKbA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,35 @@
+{
+  "users": {
+    "uid_seller_default": {
+      "uid": "uid_seller_default",
+      "mobileNumber": "0909999999",
+      "passwordHash": "e2ecf24111fe97e6c7eceaca4bdfc5f41c9637d9f5b8a03562beaa813b43c67e",
+      "passwordSalt": "default_seller_salt",
+      "role": "Seller",
+      "status": "active",
+      "fullName": "Shop Người Bán Demo",
+      "email": "seller.demo@example.com",
+      "createdAt": 1781641000000,
+      "updatedAt": 1781641000000
+    }
+  },
+  "usersByPhone": {
+    "0909999999": "uid_seller_default"
+  },
+  "userRoles": {
+    "uid_seller_default": "Seller"
+  },
+  "sellerProfiles": {
+    "uid_seller_default": {
+      "shopId": "uid_seller_default",
+      "shopName": "Shop Người Bán Demo",
+      "description": "Tài khoản người bán mặc định để kiểm thử quản lý cửa hàng.",
+      "logoUrl": "",
+      "ratingAverage": 4.8,
+      "totalProducts": 0,
+      "status": "active",
+      "createdAt": 1781641000000,
+      "updatedAt": 1781641000000
+    }
+  }
+}

@@ -1,0 +1,247 @@
+{
+  "users": {
+    "uid_customer_001": {
+      "email": "customer@example.com",
+      "displayName": "Nguyen Van A",
+      "phone": "0900000001",
+      "avatarUrl": "https://example.com/avatars/customer-001.png",
+      "role": "customer",
+      "status": "active",
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000
+    },
+    "uid_seller_001": {
+      "email": "seller@example.com",
+      "displayName": "Shop Thoi Trang ABC",
+      "phone": "0900000002",
+      "avatarUrl": "https://example.com/avatars/seller-001.png",
+      "role": "seller",
+      "status": "active",
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000
+    },
+    "uid_admin_001": {
+      "email": "admin@example.com",
+      "displayName": "Admin TMDT",
+      "role": "admin",
+      "status": "active",
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000
+    }
+  },
+  "userRoles": {
+    "uid_customer_001": "customer",
+    "uid_seller_001": "seller",
+    "uid_admin_001": "admin"
+  },
+  "customerProfiles": {
+    "uid_customer_001": {
+      "defaultAddressId": "address_001",
+      "addresses": {
+        "address_001": {
+          "receiverName": "Nguyen Van A",
+          "phone": "0900000001",
+          "line1": "123 Le Loi",
+          "ward": "Ben Nghe",
+          "district": "Quan 1",
+          "city": "Ho Chi Minh",
+          "isDefault": true
+        }
+      }
+    }
+  },
+  "sellerProfiles": {
+    "uid_seller_001": {
+      "shopId": "shop_001",
+      "shopName": "Shop Thoi Trang ABC",
+      "description": "Thoi trang nam nu",
+      "logoUrl": "https://example.com/shops/shop-001.png",
+      "ratingAverage": 4.8,
+      "totalProducts": 128,
+      "status": "active"
+    }
+  },
+  "categories": {
+    "cat_fashion": {
+      "name": "Thoi trang",
+      "slug": "thoi-trang",
+      "isActive": true
+    },
+    "cat_electronics": {
+      "name": "Dien tu",
+      "slug": "dien-tu",
+      "isActive": true
+    }
+  },
+  "products": {
+    "product_001": {
+      "sellerId": "uid_seller_001",
+      "shopId": "shop_001",
+      "categoryId": "cat_fashion",
+      "name": "Ao thun basic",
+      "slug": "ao-thun-basic",
+      "description": "Ao thun cotton form regular",
+      "price": 159000,
+      "salePrice": 129000,
+      "stock": 120,
+      "thumbnailUrl": "https://example.com/products/product-001.png",
+      "imageUrls": {
+        "image_001": "https://example.com/products/product-001-1.png",
+        "image_002": "https://example.com/products/product-001-2.png"
+      },
+      "ratingAverage": 4.7,
+      "soldCount": 82,
+      "status": "active",
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000
+    }
+  },
+  "productsByCategory": {
+    "cat_fashion": {
+      "product_001": {
+        "sellerId": "uid_seller_001",
+        "price": 129000,
+        "ratingAverage": 4.7,
+        "soldCount": 82,
+        "createdAt": 1781640000000
+      }
+    }
+  },
+  "productsBySeller": {
+    "uid_seller_001": {
+      "product_001": {
+        "categoryId": "cat_fashion",
+        "price": 129000,
+        "stock": 120,
+        "status": "active",
+        "createdAt": 1781640000000
+      }
+    }
+  },
+  "carts": {
+    "uid_customer_001": {
+      "items": {
+        "product_001": {
+          "sellerId": "uid_seller_001",
+          "shopId": "shop_001",
+          "productName": "Ao thun basic",
+          "thumbnailUrl": "https://example.com/products/product-001.png",
+          "unitPrice": 129000,
+          "quantity": 2,
+          "selectedVariantId": "variant_black_m",
+          "addedAt": 1781640000000,
+          "updatedAt": 1781640000000
+        }
+      },
+      "totalItems": 2,
+      "updatedAt": 1781640000000
+    }
+  },
+  "orders": {
+    "order_001": {
+      "customerId": "uid_customer_001",
+      "status": "pending",
+      "paymentStatus": "unpaid",
+      "paymentMethod": "cod",
+      "shippingAddress": {
+        "receiverName": "Nguyen Van A",
+        "phone": "0900000001",
+        "line1": "123 Le Loi",
+        "ward": "Ben Nghe",
+        "district": "Quan 1",
+        "city": "Ho Chi Minh"
+      },
+      "items": {
+        "order_item_001": {
+          "productId": "product_001",
+          "sellerId": "uid_seller_001",
+          "shopId": "shop_001",
+          "productName": "Ao thun basic",
+          "thumbnailUrl": "https://example.com/products/product-001.png",
+          "unitPrice": 129000,
+          "quantity": 2,
+          "subtotal": 258000
+        }
+      },
+      "subtotal": 258000,
+      "shippingFee": 25000,
+      "discountTotal": 0,
+      "grandTotal": 283000,
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000
+    }
+  },
+  "ordersByCustomer": {
+    "uid_customer_001": {
+      "order_001": {
+        "status": "pending",
+        "grandTotal": 283000,
+        "createdAt": 1781640000000
+      }
+    }
+  },
+  "ordersBySeller": {
+    "uid_seller_001": {
+      "order_001": {
+        "customerId": "uid_customer_001",
+        "status": "pending",
+        "sellerSubtotal": 258000,
+        "createdAt": 1781640000000
+      }
+    }
+  },
+  "chatSessions": {
+    "session_001": {
+      "customerId": "uid_customer_001",
+      "sellerId": "uid_seller_001",
+      "productId": "product_001",
+      "lastMessage": "Shop con size M khong?",
+      "lastMessageAt": 1781640000000,
+      "lastSenderId": "uid_customer_001",
+      "createdAt": 1781640000000,
+      "updatedAt": 1781640000000,
+      "status": "open"
+    }
+  },
+  "chatMessages": {
+    "session_001": {
+      "message_001": {
+        "senderId": "uid_customer_001",
+        "senderRole": "customer",
+        "type": "text",
+        "text": "Shop con size M khong?",
+        "createdAt": 1781640000000,
+        "readBy": {
+          "uid_customer_001": true
+        }
+      },
+      "message_002": {
+        "senderId": "uid_seller_001",
+        "senderRole": "seller",
+        "type": "text",
+        "text": "Shop con hang ban nhe.",
+        "createdAt": 1781640060000,
+        "readBy": {
+          "uid_customer_001": true,
+          "uid_seller_001": true
+        }
+      }
+    }
+  },
+  "chatSessionsByUser": {
+    "uid_customer_001": {
+      "session_001": {
+        "peerId": "uid_seller_001",
+        "peerRole": "seller",
+        "lastMessageAt": 1781640060000
+      }
+    },
+    "uid_seller_001": {
+      "session_001": {
+        "peerId": "uid_customer_001",
+        "peerRole": "customer",
+        "lastMessageAt": 1781640060000
+      }
+    }
+  }
+}
