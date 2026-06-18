@@ -5,13 +5,16 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'controllers/providers/auth_provider.dart';
 import 'controllers/providers/cart_provider.dart';
+import 'controllers/providers/language_provider.dart';
 import 'services/auth_service.dart';
 import 'services/product_detail_service.dart';
 import 'views/screens/auth_gate.dart';
 import 'views/screens/account_settings_screen.dart';
+import 'views/screens/account_features/messages_screen.dart';
+import 'views/screens/account_features/order_history_screen.dart';
 import 'views/screens/cart_screen.dart';
+import 'views/screens/category_screen.dart';
 import 'views/screens/chatbot_screen.dart';
-import 'views/screens/filter_screen.dart';
 import 'views/screens/home_screen.dart';
 import 'views/screens/order_tracking_screen.dart';
 
@@ -35,6 +38,9 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => CartProvider(ProductDetailService()),
         ),
+        ChangeNotifierProvider(
+          create: (_) => LanguageProvider(),
+        ),
       ],
       child: const MyApp(),
     ),
@@ -46,9 +52,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF2563EB);
-    const secondary = Color(0xFF14B8A6);
-    const background = Color(0xFFF5F7FB);
+    const primary = Color(0xFF5D3FD3);
+    const secondary = Color(0xFFC51162);
+    const background = Color(0xFFF8F7FC);
     const surface = Color(0xFFFFFFFF);
     const textPrimary = Color(0xFF111827);
     const textSecondary = Color(0xFF6B7280);
@@ -213,10 +219,12 @@ class MyApp extends StatelessWidget {
       ),
       routes: {
         '/home': (context) => const HomeScreen(),
-        '/category': (context) => const FilterScreen(),
+        '/category': (context) => const CategoryScreen(),
         '/cart': (context) => const CartScreen(),
         '/me': (context) => const AccountSettingsScreen(),
         '/chatbot': (context) => const ChatbotScreen(),
+        '/messages': (context) => const MessagesScreen(),
+        '/order-history': (context) => const OrderHistoryScreen(),
         '/order-tracking': (context) => const OrderTrackingScreen(),
       },
       home: const AuthGate(),

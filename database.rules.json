@@ -1,0 +1,112 @@
+{
+  "rules": {
+    ".read": true,
+    "products": {
+      ".read": true,
+      "$productId": {
+        ".write": true,
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "sellerId": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "shopId": {
+          ".validate": "newData.isString()"
+        },
+        "categoryId": {
+          ".validate": "newData.isString()"
+        },
+        "categoryName": {
+          ".validate": "newData.isString()"
+        },
+        "category": {
+          ".validate": "newData.isString()"
+        },
+        "description": {
+          ".validate": "newData.isString()"
+        },
+        "price": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "salePrice": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "stock": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "stock_quantity": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "thumbnailUrl": {
+          ".validate": "newData.isString() && (newData.val().matches(/^https?:\\/\\/.+/) || newData.val().matches(/^data:image\\/(png|jpeg|jpg|webp);base64,.+/))"
+        },
+        "imageUrls": {
+          ".validate": "newData.hasChildren(['image_001'])"
+        },
+        "colors": {
+          ".validate": "newData.hasChildren()"
+        },
+        "sizes": {
+          ".validate": "newData.hasChildren()"
+        },
+        "ratingAverage": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "soldCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "status": {
+          ".validate": "newData.val() == 'active' || newData.val() == 'hidden'"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "productsBySeller": {
+      ".read": true,
+      "$sellerId": {
+        "$productId": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['categoryId', 'price', 'stock', 'status'])"
+        }
+      }
+    },
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "usersByPhone": {
+      ".read": true,
+      ".write": true
+    },
+    "userRoles": {
+      ".read": true,
+      ".write": true
+    },
+    "sellerProfiles": {
+      ".read": true,
+      ".write": true
+    },
+    "carts": {
+      ".read": true,
+      ".write": true
+    },
+    "orders": {
+      ".read": true,
+      ".write": true
+    },
+    "ordersByCustomer": {
+      ".read": true,
+      ".write": true
+    },
+    "behavior_logs": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/bottom_nav_bar.dart';
+
 const _backgroundColor = Color(0xFFF7F7F9);
 const _primaryColor = Color(0xFF5D5FEF);
 const _titleColor = Color(0xFF20204A);
@@ -31,6 +33,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
+      bottomNavigationBar: const AppBottomNavBar(currentIndex: -1),
       body: SafeArea(
         child: Column(
           children: [
@@ -148,7 +151,7 @@ class _Header extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'Shop',
+                    text: 'Chatbot',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w900,

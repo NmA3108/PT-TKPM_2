@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../controllers/providers/auth_provider.dart';
+import '../../../controllers/providers/auth_provider.dart';
+import 'seller_messages_screen.dart';
+import 'seller_order_management_screen.dart';
 import 'seller_product_management_screen.dart';
 
 const _backgroundColor = Color(0xFFF5F7FB);
@@ -59,7 +61,13 @@ class SellerDashboardScreen extends StatelessWidget {
                 title: 'Quản lý đơn bán',
                 subtitle: 'Theo dõi đơn hàng của cửa hàng',
                 icon: Icons.receipt_long_outlined,
-                onTap: () => _showComingSoon(context),
+                onTap: user == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SellerOrderManagementScreen(),
+                          ),
+                        ),
               ),
               _SellerFeature(
                 title: 'Quản lý khuyến mãi',
@@ -71,7 +79,13 @@ class SellerDashboardScreen extends StatelessWidget {
                 title: 'Tương tác với khách hàng',
                 subtitle: 'Trả lời tin nhắn và phản hồi khách',
                 icon: Icons.chat_bubble_outline,
-                onTap: () => _showComingSoon(context),
+                onTap: user == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SellerMessagesScreen(),
+                          ),
+                        ),
               ),
               _SellerFeature(
                 title: 'Xem báo cáo bán hàng',

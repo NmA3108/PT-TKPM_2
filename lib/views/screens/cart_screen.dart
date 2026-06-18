@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,14 +5,14 @@ import '../../controllers/providers/auth_provider.dart';
 import '../../models/checkout_models.dart';
 import '../../services/checkout_service.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/chatbot_floating_button.dart';
+import '../widgets/product_image.dart';
 import 'order_checkout_screen.dart';
 
 const _backgroundColor = Color(0xFFEFFBFF);
 const _surfaceColor = Color(0xFFFFFFFF);
-const _dangerColor = Color(0xFFEF4444);
 const _primaryTextColor = Color(0xFF0B1B2E);
 const _secondaryTextColor = Color(0xFF8A8F9C);
+const _accentColor = Color(0xFF5D3FD3);
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -24,6 +23,8 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final _service = CheckoutService();
+  final _selectedProductIds = <String>{};
+  var _didInitializeSelection = false;
 
   @override
   Widget build(BuildContext context) {
@@ -41,17 +42,15 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ],
       ),
-      floatingActionButton: const ChatbotFloatingButton(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: const AppBottomNavBar(currentIndex: 2),
       body: userId == null
-          ? const _MessageState(message: 'Vui lòng đăng nhập để xem giỏ hàng.')
+          ? const _MessageState(message: 'Vui long dang nhap de xem gio hang.')
           : StreamBuilder<List<CartItemModel>>(
               stream: _service.watchCartItems(userId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Không thể tải giỏ hàng.\n${snapshot.error}',
+                    message: 'Khong the tai gio hang.\n${snapshot.error}',
                   );
                 }
 
@@ -61,10 +60,15 @@ class _CartScreenState extends State<CartScreen> {
 
                 final items = snapshot.data ?? <CartItemModel>[];
                 if (items.isEmpty) {
-                  return const _MessageState(message: 'Giỏ hàng đang trống.');
+                  return const _MessageState(message: 'Gio hang dang trong.');
                 }
 
-                final subtotal = items.fold<double>(
+                _syncSelectedItems(items);
+                final selectedItems = items
+                    .where((item) => _selectedProductIds.contains(item.productId))
+                    .toList();
+                final groups = _groupItemsByShop(items);
+                final subtotal = selectedItems.fold<double>(
                   0,
                   (total, item) => total + item.subtotal,
                 );
@@ -74,37 +78,43 @@ class _CartScreenState extends State<CartScreen> {
                     Expanded(
                       child: ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                        itemCount: items.length,
+                        itemCount: groups.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 18),
                         itemBuilder: (context, index) {
-                          final item = items[index];
-                          return _CartItemCard(
-                            item: item,
-                            onDecrease: () => _updateQuantity(
+                          final group = groups[index];
+                          return _ShopCartGroup(
+                            group: group,
+                            selectedProductIds: _selectedProductIds,
+                            onSelectedChanged: _toggleItemSelection,
+                            onDecrease: (item) => _updateQuantity(
                               userId,
                               item,
                               item.quantity - 1,
                             ),
-                            onIncrease: () => _updateQuantity(
+                            onIncrease: (item) => _updateQuantity(
                               userId,
                               item,
                               item.quantity + 1,
                             ),
-                            onDelete: () => _removeItem(userId, item),
+                            onDelete: (item) => _removeItem(userId, item),
                           );
                         },
                       ),
                     ),
                     _CartSummaryPanel(
                       subtotal: subtotal,
-                      itemCount: items.length,
-                      onCheckout: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => OrderCheckoutScreen(items: items),
-                          ),
-                        );
-                      },
+                      itemCount: selectedItems.length,
+                      onCheckout: selectedItems.isEmpty
+                          ? null
+                          : () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => OrderCheckoutScreen(
+                                    items: selectedItems,
+                                  ),
+                                ),
+                              );
+                            },
                     ),
                   ],
                 );
@@ -125,17 +135,72 @@ class _CartScreenState extends State<CartScreen> {
         quantity: quantity,
       );
     } catch (error) {
-      _showSnackBar('Cập nhật giỏ hàng thất bại: $error');
+      _showSnackBar('Cap nhat gio hang that bai: $error');
     }
   }
 
   Future<void> _removeItem(String userId, CartItemModel item) async {
     try {
       await _service.removeCartItem(userId: userId, productId: item.productId);
-      _showSnackBar('Đã xóa sản phẩm khỏi giỏ hàng.');
+      _selectedProductIds.remove(item.productId);
+      _showSnackBar('Da xoa san pham khoi gio hang.');
     } catch (error) {
-      _showSnackBar('Xóa sản phẩm thất bại: $error');
+      _showSnackBar('Xoa san pham that bai: $error');
     }
+  }
+
+  void _syncSelectedItems(List<CartItemModel> items) {
+    final currentIds = items.map((item) => item.productId).toSet();
+    if (!_didInitializeSelection) {
+      _selectedProductIds
+        ..clear()
+        ..addAll(currentIds);
+      _didInitializeSelection = true;
+      return;
+    }
+
+    _selectedProductIds.removeWhere((id) => !currentIds.contains(id));
+  }
+
+  void _toggleItemSelection(CartItemModel item, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedProductIds.add(item.productId);
+      } else {
+        _selectedProductIds.remove(item.productId);
+      }
+    });
+  }
+
+  List<_ShopCartGroupData> _groupItemsByShop(List<CartItemModel> items) {
+    final grouped = <String, List<CartItemModel>>{};
+    for (final item in items) {
+      final shopKey = _shopGroupKey(item);
+      grouped.putIfAbsent(shopKey, () => <CartItemModel>[]).add(item);
+    }
+
+    return grouped.entries.map((entry) {
+      final firstItem = entry.value.first;
+      final shopName = firstItem.shopName.trim().isNotEmpty
+          ? firstItem.shopName.trim()
+          : entry.key == 'default_shop'
+              ? 'Shop'
+              : 'Shop ${entry.key}';
+      return _ShopCartGroupData(shopName: shopName, items: entry.value);
+    }).toList();
+  }
+
+  String _shopGroupKey(CartItemModel item) {
+    if (item.shopName.trim().isNotEmpty) {
+      return item.shopName.trim();
+    }
+    if (item.shopId.trim().isNotEmpty) {
+      return item.shopId.trim();
+    }
+    if (item.sellerId.trim().isNotEmpty) {
+      return item.sellerId.trim();
+    }
+    return 'default_shop';
   }
 
   void _showSnackBar(String message) {
@@ -148,24 +213,36 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
-class _CartItemCard extends StatelessWidget {
-  const _CartItemCard({
-    required this.item,
+class _ShopCartGroupData {
+  const _ShopCartGroupData({
+    required this.shopName,
+    required this.items,
+  });
+
+  final String shopName;
+  final List<CartItemModel> items;
+}
+
+class _ShopCartGroup extends StatelessWidget {
+  const _ShopCartGroup({
+    required this.group,
+    required this.selectedProductIds,
+    required this.onSelectedChanged,
     required this.onDecrease,
     required this.onIncrease,
     required this.onDelete,
   });
 
-  final CartItemModel item;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
-  final VoidCallback onDelete;
+  final _ShopCartGroupData group;
+  final Set<String> selectedProductIds;
+  final void Function(CartItemModel item, bool selected) onSelectedChanged;
+  final ValueChanged<CartItemModel> onDecrease;
+  final ValueChanged<CartItemModel> onIncrease;
+  final ValueChanged<CartItemModel> onDelete;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 96,
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _surfaceColor,
         borderRadius: BorderRadius.circular(22),
@@ -177,8 +254,82 @@ class _CartItemCard extends StatelessWidget {
           ),
         ],
       ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.storefront_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    group.shopName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _primaryTextColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          for (var index = 0; index < group.items.length; index++) ...[
+            _CartItemCard(
+              item: group.items[index],
+              isSelected: selectedProductIds.contains(group.items[index].productId),
+              onSelectedChanged: (selected) {
+                onSelectedChanged(group.items[index], selected);
+              },
+              onDecrease: () => onDecrease(group.items[index]),
+              onIncrease: () => onIncrease(group.items[index]),
+              onDelete: () => onDelete(group.items[index]),
+            ),
+            if (index < group.items.length - 1)
+              const Divider(height: 1, indent: 16, endIndent: 16),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CartItemCard extends StatelessWidget {
+  const _CartItemCard({
+    required this.item,
+    required this.isSelected,
+    required this.onSelectedChanged,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.onDelete,
+  });
+
+  final CartItemModel item;
+  final bool isSelected;
+  final ValueChanged<bool> onSelectedChanged;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
+          Checkbox(
+            value: isSelected,
+            onChanged: (value) => onSelectedChanged(value ?? false),
+            activeColor: _accentColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          const SizedBox(width: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: SizedBox(
@@ -186,12 +337,12 @@ class _CartItemCard extends StatelessWidget {
               width: 66,
               child: ColoredBox(
                 color: const Color(0xFFEDE3FF),
-                child: CachedNetworkImage(
+                child: ProductImage(
                   imageUrl: item.thumbnailUrl,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Icon(
+                  errorWidget: const Icon(
                     Icons.shopping_bag,
-                    color: Color(0xFF347DFF),
+                    color: _accentColor,
                   ),
                 ),
               ),
@@ -214,7 +365,7 @@ class _CartItemCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${item.selectedColor} • ${item.selectedSize}',
+                  '${item.selectedColor} - ${item.selectedSize}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -241,7 +392,7 @@ class _CartItemCard extends StatelessWidget {
                 onTap: onDelete,
                 child: const Icon(Icons.close, size: 18),
               ),
-              const Spacer(),
+              const SizedBox(height: 16),
               _QuantityStepper(
                 quantity: item.quantity,
                 onDecrease: onDecrease,
@@ -306,14 +457,14 @@ class _CircleStepButton extends StatelessWidget {
         height: 28,
         width: 28,
         decoration: BoxDecoration(
-          color: filled ? const Color(0xFF347DFF) : Colors.white,
+          color: filled ? _accentColor : Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF347DFF), width: 1.4),
+          border: Border.all(color: _accentColor, width: 1.4),
         ),
         child: Icon(
           icon,
           size: 16,
-          color: filled ? Colors.white : const Color(0xFF347DFF),
+          color: filled ? Colors.white : _accentColor,
         ),
       ),
     );
@@ -329,17 +480,17 @@ class _CartSummaryPanel extends StatelessWidget {
 
   final double subtotal;
   final int itemCount;
-  final VoidCallback onCheckout;
+  final VoidCallback? onCheckout;
 
   @override
   Widget build(BuildContext context) {
     const shipping = 2.0;
-    final total = subtotal + shipping;
+    final total = itemCount == 0 ? 0.0 : subtotal + shipping;
 
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 28, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 22),
         decoration: const BoxDecoration(
           color: _surfaceColor,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -348,23 +499,24 @@ class _CartSummaryPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _SummaryLine(label: 'Subtotal', value: subtotal),
-            const Divider(height: 28),
-            _SummaryLine(label: 'Shipping', value: shipping),
-            const Divider(height: 28),
+            const Divider(height: 24),
+            _SummaryLine(label: 'Shipping', value: itemCount == 0 ? 0 : shipping),
+            const Divider(height: 24),
             _SummaryLine(
               label: 'Bag Total',
               value: total,
               itemCount: itemCount,
               emphasized: true,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: FilledButton(
                 onPressed: onCheckout,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
+                  backgroundColor: _accentColor,
+                  disabledBackgroundColor: const Color(0xFFC7CBD5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -411,26 +563,12 @@ class _SummaryLine extends StatelessWidget {
             '($itemCount items) ',
             style: const TextStyle(color: _secondaryTextColor, fontSize: 12),
           ),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: _formatCurrency(value),
-                style: TextStyle(
-                  color: _primaryTextColor,
-                  fontSize: emphasized ? 18 : 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const TextSpan(
-                text: ' USD',
-                style: TextStyle(
-                  color: _secondaryTextColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+        Text(
+          _formatCurrency(value),
+          style: TextStyle(
+            color: _primaryTextColor,
+            fontSize: emphasized ? 18 : 16,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ],
@@ -455,5 +593,5 @@ class _MessageState extends StatelessWidget {
 }
 
 String _formatCurrency(double value) {
-  return '\$${value.toStringAsFixed(2)}';
+  return '${value.toStringAsFixed(value >= 100 ? 0 : 2)} d';
 }

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/providers/auth_provider.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
-import 'seller_dashboard_screen.dart';
+import 'seller_features/seller_dashboard_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});

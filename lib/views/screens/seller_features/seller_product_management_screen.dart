@@ -1,8 +1,13 @@
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
-import '../../models/product_model.dart';
-import '../../services/seller_product_service.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../l10n/app_strings.dart';
+import '../../../models/product_model.dart';
+import '../../../services/seller_product_service.dart';
+import '../../widgets/product_image.dart';
 
 const _backgroundColor = Color(0xFFF5F7FB);
 const _surfaceColor = Color(0xFFFFFFFF);
@@ -28,20 +33,19 @@ class SellerProductManagementScreen extends StatefulWidget {
 class _SellerProductManagementScreenState
     extends State<SellerProductManagementScreen> {
   final _service = SellerProductService();
+  var _isSaving = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: const Text('Quản lý sản phẩm'),
-      ),
+      appBar: AppBar(title: Text(context.tr('sellerProducts'))),
       body: StreamBuilder<List<ProductModel>>(
         stream: _service.watchSellerProducts(widget.sellerId),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return _MessageState(
-              message: 'Không thể tải danh sách sản phẩm.\n${snapshot.error}',
+              message: '${context.tr('cannotLoadProducts')}\n${snapshot.error}',
             );
           }
 
@@ -51,9 +55,7 @@ class _SellerProductManagementScreenState
 
           final products = snapshot.data ?? <ProductModel>[];
           if (products.isEmpty) {
-            return const _MessageState(
-              message: 'Cửa hàng chưa có sản phẩm nào.',
-            );
+            return _MessageState(message: context.tr('noProducts'));
           }
 
           return ListView.separated(
@@ -71,9 +73,15 @@ class _SellerProductManagementScreenState
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openProductForm(null),
-        icon: const Icon(Icons.add_box_outlined),
-        label: const Text('Đăng sản phẩm mới'),
+        onPressed: _isSaving ? null : () => _openProductForm(null),
+        icon: _isSaving
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.add_box_outlined),
+        label: Text(context.tr('addProduct')),
       ),
     );
   }
@@ -90,7 +98,31 @@ class _SellerProductManagementScreenState
       return;
     }
 
+    setState(() => _isSaving = true);
     try {
+      var imageUrl = product?.imageUrl ?? '';
+      if (result.imageBytes != null) {
+        try {
+          imageUrl = await _service.uploadProductImage(
+            sellerId: widget.sellerId,
+            bytes: result.imageBytes!,
+            fileName: result.imageName ?? 'product.jpg',
+          );
+        } catch (error) {
+          imageUrl = _buildInlineImageDataUrl(
+            result.imageBytes!,
+            result.imageName ?? 'product.jpg',
+          );
+          _showSnackBar(
+            'Không tải được ảnh lên Storage, app đã lưu ảnh trực tiếp để tiếp tục đăng sản phẩm.',
+          );
+        }
+      }
+
+      if (product == null && imageUrl.isEmpty) {
+        throw Exception(context.tr('uploadRequired'));
+      }
+
       if (product == null) {
         await _service.createProduct(
           sellerId: widget.sellerId,
@@ -101,7 +133,7 @@ class _SellerProductManagementScreenState
           stock: result.stock,
           categoryId: result.categoryId,
           categoryName: result.categoryName,
-          thumbnailUrl: result.thumbnailUrl,
+          thumbnailUrl: imageUrl,
         );
         _showSnackBar('Đăng sản phẩm mới thành công.');
       } else {
@@ -111,12 +143,16 @@ class _SellerProductManagementScreenState
           price: result.price,
           stock: result.stock,
           categoryName: result.categoryName,
-          thumbnailUrl: result.thumbnailUrl,
+          thumbnailUrl: imageUrl,
         );
-        _showSnackBar('Cập nhật thông tin sản phẩm thành công.');
+        _showSnackBar('Cập nhật sản phẩm thành công.');
       }
     } catch (error) {
       _showSnackBar('Thao tác thất bại: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -160,6 +196,16 @@ class _SellerProductManagementScreenState
       SnackBar(content: Text(message)),
     );
   }
+
+  String _buildInlineImageDataUrl(Uint8List bytes, String fileName) {
+    final lowerName = fileName.toLowerCase();
+    final mimeType = lowerName.endsWith('.png')
+        ? 'image/png'
+        : lowerName.endsWith('.webp')
+            ? 'image/webp'
+            : 'image/jpeg';
+    return 'data:$mimeType;base64,${base64Encode(bytes)}';
+  }
 }
 
 class _SellerProductCard extends StatelessWidget {
@@ -190,10 +236,10 @@ class _SellerProductCard extends StatelessWidget {
               child: SizedBox(
                 height: 82,
                 width: 82,
-                child: CachedNetworkImage(
+                child: ProductImage(
                   imageUrl: product.imageUrl,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const ColoredBox(
+                  errorWidget: const ColoredBox(
                     color: Color(0xFFE5E7EB),
                     child: Icon(Icons.image_not_supported_outlined),
                   ),
@@ -237,7 +283,7 @@ class _SellerProductCard extends StatelessWidget {
             Column(
               children: [
                 IconButton(
-                  tooltip: 'Cập nhật thông tin sản phẩm',
+                  tooltip: context.tr('editProduct'),
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
                 ),
@@ -269,13 +315,15 @@ class _ProductFormSheet extends StatefulWidget {
 
 class _ProductFormSheetState extends State<_ProductFormSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _picker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _priceController;
   late final TextEditingController _stockController;
   late final TextEditingController _categoryIdController;
   late final TextEditingController _categoryNameController;
-  late final TextEditingController _imageController;
+  Uint8List? _imageBytes;
+  String? _imageName;
 
   @override
   void initState() {
@@ -295,7 +343,6 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     _categoryNameController = TextEditingController(
       text: product?.categoryName ?? 'Fashion',
     );
-    _imageController = TextEditingController(text: product?.imageUrl ?? '');
   }
 
   @override
@@ -306,7 +353,6 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     _stockController.dispose();
     _categoryIdController.dispose();
     _categoryNameController.dispose();
-    _imageController.dispose();
     super.dispose();
   }
 
@@ -329,13 +375,19 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                isEditing ? 'Cập nhật sản phẩm' : 'Đăng sản phẩm mới',
+                isEditing ? context.tr('editProduct') : context.tr('addProduct'),
                 style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 16),
+              _ImagePickerBox(
+                imageBytes: _imageBytes,
+                existingImageUrl: widget.product?.imageUrl,
+                onPick: _pickImage,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Tên sản phẩm'),
+                decoration: InputDecoration(labelText: context.tr('productName')),
                 validator: _requiredValidator,
               ),
               const SizedBox(height: 12),
@@ -343,44 +395,40 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                 controller: _descriptionController,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Mô tả'),
+                decoration: InputDecoration(labelText: context.tr('description')),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _priceController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Giá bán'),
+                decoration: InputDecoration(labelText: context.tr('price')),
                 validator: _numberValidator,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _stockController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Số lượng tồn kho'),
+                decoration: InputDecoration(labelText: context.tr('stock')),
                 validator: _intValidator,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _categoryIdController,
-                decoration: const InputDecoration(labelText: 'Mã danh mục'),
+                decoration: InputDecoration(labelText: context.tr('categoryId')),
                 validator: _requiredValidator,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _categoryNameController,
-                decoration: const InputDecoration(labelText: 'Tên danh mục'),
-                validator: _requiredValidator,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _imageController,
-                decoration: const InputDecoration(labelText: 'URL hình ảnh'),
+                decoration: InputDecoration(labelText: context.tr('categoryName')),
                 validator: _requiredValidator,
               ),
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: _submit,
-                child: Text(isEditing ? 'Lưu thay đổi' : 'Đăng sản phẩm'),
+                child: Text(
+                  isEditing ? context.tr('saveChanges') : context.tr('publishProduct'),
+                ),
               ),
             ],
           ),
@@ -389,8 +437,32 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     );
   }
 
+  Future<void> _pickImage() async {
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 72,
+    );
+    if (image == null) {
+      return;
+    }
+
+    final bytes = await image.readAsBytes();
+    setState(() {
+      _imageBytes = bytes;
+      _imageName = image.name;
+    });
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    if (widget.product == null && _imageBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('uploadRequired'))),
+      );
       return;
     }
 
@@ -402,7 +474,8 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         stock: int.parse(_stockController.text.trim()),
         categoryId: _categoryIdController.text.trim(),
         categoryName: _categoryNameController.text.trim(),
-        thumbnailUrl: _imageController.text.trim(),
+        imageBytes: _imageBytes,
+        imageName: _imageName,
       ),
     );
   }
@@ -419,9 +492,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     if (error != null) {
       return error;
     }
-    return double.tryParse(value!.trim()) == null
-        ? 'Giá bán không hợp lệ.'
-        : null;
+    return double.tryParse(value!.trim()) == null ? 'Giá bán không hợp lệ.' : null;
   }
 
   String? _intValidator(String? value) {
@@ -435,6 +506,69 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
   }
 }
 
+class _ImagePickerBox extends StatelessWidget {
+  const _ImagePickerBox({
+    required this.imageBytes,
+    required this.existingImageUrl,
+    required this.onPick,
+  });
+
+  final Uint8List? imageBytes;
+  final String? existingImageUrl;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasExistingImage =
+        existingImageUrl != null && existingImageUrl!.trim().isNotEmpty;
+
+    return InkWell(
+      onTap: onPick,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFD1D5DB)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (imageBytes != null)
+              Image.memory(imageBytes!, fit: BoxFit.cover)
+            else if (hasExistingImage)
+              ProductImage(imageUrl: existingImageUrl!, fit: BoxFit.cover)
+            else
+              const Center(
+                child: Icon(Icons.add_photo_alternate_outlined, size: 44),
+              ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                color: Colors.black.withOpacity(0.52),
+                child: Text(
+                  imageBytes == null && !hasExistingImage
+                      ? context.tr('chooseImage')
+                      : context.tr('changeImage'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProductFormResult {
   const _ProductFormResult({
     required this.name,
@@ -443,7 +577,8 @@ class _ProductFormResult {
     required this.stock,
     required this.categoryId,
     required this.categoryName,
-    required this.thumbnailUrl,
+    required this.imageBytes,
+    required this.imageName,
   });
 
   final String name;
@@ -452,7 +587,8 @@ class _ProductFormResult {
   final int stock;
   final String categoryId;
   final String categoryName;
-  final String thumbnailUrl;
+  final Uint8List? imageBytes;
+  final String? imageName;
 }
 
 class _MessageState extends StatelessWidget {

@@ -3,7 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/providers/auth_provider.dart';
 import '../../models/app_user.dart';
+import '../widgets/bottom_nav_bar.dart';
+import 'account_features/messages_screen.dart';
+import 'account_features/order_history_screen.dart';
+import 'account_features/seller_registration_screen.dart';
 import 'address_settings_screen.dart';
+import 'chatbot_screen.dart';
 import 'edit_profile_screen.dart';
 import 'payment_methods_screen.dart';
 
@@ -20,84 +25,150 @@ class AccountSettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(
-        title: const Text('Account settings'),
-      ),
+      bottomNavigationBar: const AppBottomNavBar(currentIndex: 3),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+        padding: EdgeInsets.zero,
         children: [
-          _AccountSummary(user: user),
-          const SizedBox(height: 16),
-          _SettingsSection(
-            children: [
-              _AccountSettingsTile(
-                icon: Icons.person_outline,
-                title: 'Edit profile',
-                subtitle: user?.fullName.isEmpty ?? true
-                    ? 'Add your name and email'
-                    : user!.fullName,
-                onTap: user == null
-                    ? null
-                    : () => _open(
-                          context,
-                          EditProfileScreen(currentUid: user.uid),
-                        ),
-              ),
-              _AccountSettingsTile(
-                icon: Icons.location_on_outlined,
-                title: 'Delivery address',
-                subtitle: user?.deliveryAddress.isEmpty ?? true
-                    ? 'Add shipping address'
-                    : user!.deliveryAddress,
-                onTap: user == null
-                    ? null
-                    : () => _open(
-                          context,
-                          AddressSettingsScreen(currentUid: user.uid),
-                        ),
-              ),
-              _AccountSettingsTile(
-                icon: Icons.credit_card_outlined,
-                title: 'Payment account',
-                subtitle: user?.paymentAccount.isEmpty ?? true
-                    ? 'Add payment info'
-                    : user!.paymentAccount,
-                onTap: user == null
-                    ? null
-                    : () => _open(
-                          context,
-                          PaymentMethodsScreen(currentUid: user.uid),
-                        ),
-              ),
-              _AccountSettingsTile(
-                icon: Icons.lock_outline,
-                title: 'Change password',
-                subtitle: 'Update your login password',
-                onTap: user == null
-                    ? null
-                    : () => _open(context, const _ChangePasswordScreen()),
-              ),
-            ],
+          _AccountHero(user: user),
+          const SizedBox(height: 12),
+          _PurchaseSection(
+            onHistoryTap: () => _open(context, const OrderHistoryScreen()),
           ),
           const SizedBox(height: 16),
-          _SettingsSection(
-            children: [
-              _AccountSettingsTile(
-                icon: Icons.logout,
-                title: 'Logout',
-                subtitle: 'Return to login screen',
-                onTap: () => _confirmLogout(context),
-              ),
-              _AccountSettingsTile(
-                icon: Icons.delete_forever_outlined,
-                title: 'Delete account',
-                subtitle: 'Disable this account permanently',
-                iconColor: _dangerColor,
-                titleColor: _dangerColor,
-                onTap: user == null ? null : () => _confirmDelete(context),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SettingsSection(
+              title: 'Tai khoan cua toi',
+              children: [
+                _AccountSettingsTile(
+                  icon: Icons.person_outline,
+                  title: 'Ho so cua toi',
+                  subtitle: user?.fullName.isEmpty ?? true
+                      ? 'Cap nhat ten va email'
+                      : user!.fullName,
+                  onTap: user == null
+                      ? null
+                      : () => _open(
+                            context,
+                            EditProfileScreen(currentUid: user.uid),
+                          ),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.location_on_outlined,
+                  title: 'Dia chi',
+                  subtitle: user?.deliveryAddress.isEmpty ?? true
+                      ? 'Them dia chi nhan hang'
+                      : user!.deliveryAddress,
+                  onTap: user == null
+                      ? null
+                      : () => _open(
+                            context,
+                            AddressSettingsScreen(currentUid: user.uid),
+                          ),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.credit_card_outlined,
+                  title: 'Tai khoan thanh toan',
+                  subtitle: user?.paymentAccount.isEmpty ?? true
+                      ? 'Them thong tin thanh toan'
+                      : user!.paymentAccount,
+                  onTap: user == null
+                      ? null
+                      : () => _open(
+                            context,
+                            PaymentMethodsScreen(currentUid: user.uid),
+                          ),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.lock_outline,
+                  title: 'Doi mat khau',
+                  subtitle: 'Cap nhat mat khau dang nhap',
+                  onTap: user == null
+                      ? null
+                      : () => _open(context, const _ChangePasswordScreen()),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SettingsSection(
+              title: 'Tien ich khac',
+              children: [
+                _AccountSettingsTile(
+                  icon: Icons.storefront_outlined,
+                  title: 'Dang ky ban hang',
+                  subtitle: 'Mo kenh nguoi ban va quan ly san pham',
+                  onTap: user == null
+                      ? null
+                      : () => _open(context, const SellerRegistrationScreen()),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.favorite_border,
+                  title: 'San pham yeu thich',
+                  subtitle: 'Xem lai danh sach wishlist',
+                  onTap: () => _showMessage(context, 'Chuc nang dang phat trien.'),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.local_offer_outlined,
+                  title: 'Kho voucher',
+                  subtitle: 'Quan ly voucher va uu dai',
+                  onTap: () => _showMessage(context, 'Chuc nang dang phat trien.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SettingsSection(
+              title: 'Ho tro',
+              children: [
+                _AccountSettingsTile(
+                  icon: Icons.support_agent_outlined,
+                  title: 'Trung tam ho tro',
+                  subtitle: 'Hoi dap va huong dan su dung',
+                  onTap: () => _open(context, const ChatbotScreen()),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.chat_bubble_outline,
+                  title: 'Tin nhan',
+                  subtitle: 'Danh sach seller da tung nhan tin',
+                  onTap: () => _open(context, const MessagesScreen()),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.info_outline,
+                  title: 'Ve XeGiaTot',
+                  subtitle: 'Thong tin ung dung va chinh sach',
+                  onTap: () => _showMessage(context, 'XeGiaTot - san xe truc tuyen.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SettingsSection(
+              children: [
+                _AccountSettingsTile(
+                  icon: Icons.logout,
+                  title: 'Dang xuat',
+                  subtitle: 'Quay lai man hinh dang nhap',
+                  onTap: () => _confirmLogout(context),
+                ),
+                _AccountSettingsTile(
+                  icon: Icons.delete_forever_outlined,
+                  title: 'Xoa tai khoan',
+                  subtitle: 'Vo hieu hoa tai khoan nay',
+                  iconColor: _dangerColor,
+                  titleColor: _dangerColor,
+                  onTap: user == null ? null : () => _confirmDelete(context),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -229,6 +300,220 @@ class _AccountSummary extends StatelessWidget {
                   Text(user!.email, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountHero extends StatelessWidget {
+  const _AccountHero({required this.user});
+
+  final AppUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user?.fullName.trim().isNotEmpty == true
+        ? user!.fullName.trim()
+        : user?.mobileNumber ?? 'Khach hang';
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        18,
+        MediaQuery.of(context).padding.top + 18,
+        18,
+        24,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFF4D2D), Color(0xFFFF7A3D)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: Colors.white.withOpacity(0.92),
+            child: const Icon(Icons.person, color: Color(0xFFFF4D2D), size: 38),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Bac',
+                    style: TextStyle(
+                      color: Color(0xFF4B5563),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cai dat',
+            onPressed: () {},
+            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 30),
+          ),
+          IconButton(
+            tooltip: 'Tin nhan',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ChatbotScreen()),
+            ),
+            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 30),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PurchaseSection extends StatelessWidget {
+  const _PurchaseSection({required this.onHistoryTap});
+
+  final VoidCallback onHistoryTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: _surfaceColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120F172A),
+              blurRadius: 24,
+              offset: Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Don mua',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: onHistoryTap,
+                    icon: const Icon(Icons.history),
+                    label: const Text('Xem lich su mua hang'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _PurchaseAction(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Cho xac nhan',
+                  ),
+                  _PurchaseAction(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'Cho lay hang',
+                  ),
+                  _PurchaseAction(
+                    icon: Icons.local_shipping_outlined,
+                    label: 'Cho giao hang',
+                  ),
+                  _PurchaseAction(
+                    icon: Icons.star_border_rounded,
+                    label: 'Danh gia',
+                    badge: '3',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PurchaseAction extends StatelessWidget {
+  const _PurchaseAction({
+    required this.icon,
+    required this.label,
+    this.badge,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 82,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(icon, size: 36, color: const Color(0xFF111827)),
+              if (badge != null)
+                Positioned(
+                  right: -10,
+                  top: -10,
+                  child: Container(
+                    height: 24,
+                    constraints: const BoxConstraints(minWidth: 24),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF4D2D),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13),
           ),
         ],
       ),
@@ -422,28 +707,50 @@ class _FormScaffold extends StatelessWidget {
 }
 
 class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({required this.children});
+  const _SettingsSection({
+    required this.children,
+    this.title,
+  });
 
   final List<Widget> children;
+  final String? title;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _surfaceColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x120F172A),
-            blurRadius: 24,
-            offset: Offset(0, 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (title != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Text(
+              title!,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+              ),
+            ),
           ),
         ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(children: children),
-      ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: _surfaceColor,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x120F172A),
+                blurRadius: 24,
+                offset: Offset(0, 14),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(children: children),
+          ),
+        ),
+      ],
     );
   }
 }

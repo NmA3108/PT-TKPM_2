@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
+
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -17,7 +19,7 @@ class AppBottomNavBar extends StatelessWidget {
         padding: const EdgeInsets.only(top: 8),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
@@ -32,28 +34,28 @@ class AppBottomNavBar extends StatelessWidget {
             _NavItem(
               icon: Icons.home_outlined,
               activeIcon: Icons.home_rounded,
-              label: 'Home',
+              label: context.tr('home'),
               isActive: currentIndex == 0,
               onTap: () => _open(context, 0),
             ),
             _NavItem(
-              icon: Icons.grid_view_outlined,
-              activeIcon: Icons.grid_view_rounded,
-              label: 'Category',
+              icon: Icons.chat_bubble_outline_rounded,
+              activeIcon: Icons.chat_bubble_rounded,
+              label: context.tr('message'),
               isActive: currentIndex == 1,
               onTap: () => _open(context, 1),
             ),
             _NavItem(
               icon: Icons.shopping_bag_outlined,
               activeIcon: Icons.shopping_bag_rounded,
-              label: 'Cart',
+              label: context.tr('cart'),
               isActive: currentIndex == 2,
               onTap: () => _open(context, 2),
             ),
             _NavItem(
               icon: Icons.person_outline_rounded,
               activeIcon: Icons.person_rounded,
-              label: 'Me',
+              label: context.tr('me'),
               isActive: currentIndex == 3,
               onTap: () => _open(context, 3),
             ),
@@ -70,7 +72,7 @@ class AppBottomNavBar extends StatelessWidget {
 
     final routeName = switch (index) {
       0 => '/home',
-      1 => '/category',
+      1 => '/messages',
       2 => '/cart',
       3 => '/me',
       _ => '/home',
@@ -97,7 +99,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? const Color(0xFF347DFF) : const Color(0xFF5F6673);
+    final color = isActive ? const Color(0xFF5D3FD3) : const Color(0xFF6B7280);
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),

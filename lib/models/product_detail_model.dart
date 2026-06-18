@@ -12,6 +12,7 @@ class ProductDetailModel {
     required this.categoryId,
     required this.sellerId,
     required this.shopId,
+    required this.shopName,
     required this.status,
     required this.colors,
     required this.sizes,
@@ -29,6 +30,7 @@ class ProductDetailModel {
   final String categoryId;
   final String sellerId;
   final String shopId;
+  final String shopName;
   final String status;
   final List<String> colors;
   final List<String> sizes;
@@ -56,6 +58,7 @@ class ProductDetailModel {
       categoryId: _readString(map, ['categoryId']),
       sellerId: _readString(map, ['sellerId']),
       shopId: _readString(map, ['shopId']),
+      shopName: _readString(map, ['shopName', 'storeName', 'sellerName']),
       status: _readString(map, ['status'], fallback: 'active'),
       colors: _readStringList(map, ['colors', 'colorOptions']),
       sizes: _readStringList(map, ['sizes', 'sizeOptions']),
@@ -72,6 +75,7 @@ class ProductDetailModel {
     return {
       'sellerId': sellerId,
       'shopId': shopId,
+      'shopName': shopName,
       'productName': name,
       'thumbnailUrl': imageUrl,
       'unitPrice': price,

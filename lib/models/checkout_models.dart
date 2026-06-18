@@ -9,6 +9,7 @@ class CartItemModel {
     required this.selectedSize,
     required this.sellerId,
     required this.shopId,
+    required this.shopName,
   });
 
   final String productId;
@@ -20,6 +21,7 @@ class CartItemModel {
   final String selectedSize;
   final String sellerId;
   final String shopId;
+  final String shopName;
 
   double get subtotal => unitPrice * quantity;
 
@@ -34,6 +36,7 @@ class CartItemModel {
       selectedSize: map['selectedSize'] as String? ?? '',
       sellerId: map['sellerId'] as String? ?? '',
       shopId: map['shopId'] as String? ?? '',
+      shopName: map['shopName'] as String? ?? '',
     );
   }
 
@@ -42,6 +45,7 @@ class CartItemModel {
       'productId': productId,
       'sellerId': sellerId,
       'shopId': shopId,
+      'shopName': shopName,
       'productName': productName,
       'thumbnailUrl': thumbnailUrl,
       'unitPrice': unitPrice,
