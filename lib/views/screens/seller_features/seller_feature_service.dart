@@ -24,26 +24,41 @@ class SellerFeatureService {
       }
 
       final orders = <SellerOrderModel>[];
+
       for (final entry in value.entries) {
         final orderValue = entry.value;
+
         if (orderValue is Map<dynamic, dynamic>) {
-          final order = SellerOrderModel.fromMap(entry.key.toString(), orderValue);
+          final order = SellerOrderModel.fromMap(
+            entry.key.toString(),
+            orderValue,
+          );
+
           if (order.sellerIds.contains(sellerId)) {
             orders.add(order);
           }
         }
       }
+
       orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return orders;
     });
   }
 
   Future<void> confirmSellerOrder(SellerOrderModel order) async {
+    await updateSellerOrderStatus(order, 'confirmed');
+  }
+
+  Future<void> updateSellerOrderStatus(
+    SellerOrderModel order,
+    String newStatus,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+
     await _database.ref().update({
-      'orders/${order.id}/status': 'confirmed',
+      'orders/${order.id}/status': newStatus,
       'orders/${order.id}/updatedAt': now,
-      'ordersByCustomer/${order.customerId}/${order.id}/status': 'confirmed',
+      'ordersByCustomer/${order.customerId}/${order.id}/status': newStatus,
       'ordersByCustomer/${order.customerId}/${order.id}/updatedAt': now,
     });
   }
@@ -58,8 +73,10 @@ class SellerFeatureService {
       }
 
       final conversations = <SellerCustomerConversationModel>[];
+
       for (final entry in value.entries) {
         final conversationValue = entry.value;
+
         if (conversationValue is Map<dynamic, dynamic>) {
           conversations.add(
             SellerCustomerConversationModel.fromMap(
@@ -69,6 +86,7 @@ class SellerFeatureService {
           );
         }
       }
+
       conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return conversations;
     });
@@ -90,8 +108,10 @@ class SellerFeatureService {
       }
 
       final messages = <SellerCustomerMessageModel>[];
+
       for (final entry in value.entries) {
         final messageValue = entry.value;
+
         if (messageValue is Map<dynamic, dynamic>) {
           messages.add(
             SellerCustomerMessageModel.fromMap(
@@ -101,6 +121,7 @@ class SellerFeatureService {
           );
         }
       }
+
       messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return messages;
     });
@@ -117,13 +138,15 @@ class SellerFeatureService {
         .child(customerId)
         .child('items')
         .push();
+
     final messageId = messageRef.key;
     if (messageId == null) {
-      throw Exception('Khong the gui tin nhan.');
+      throw Exception('Không thể gửi tin nhắn.');
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final cleanText = text.trim();
+
     await _database.ref().update({
       'sellerMessages/$sellerId/$customerId/customerId': customerId,
       'sellerMessages/$sellerId/$customerId/lastMessage': cleanText,
@@ -157,6 +180,7 @@ class SellerOrderModel {
     required this.createdAt,
     required this.sellerIds,
     required this.firstProductName,
+    required this.itemCount,
   });
 
   final String id;
@@ -166,21 +190,30 @@ class SellerOrderModel {
   final int createdAt;
   final Set<String> sellerIds;
   final String firstProductName;
+  final int itemCount;
 
   bool get canConfirm => status == 'pending';
 
   factory SellerOrderModel.fromMap(String id, Map<dynamic, dynamic> map) {
     final sellerIds = <String>{};
-    var firstProductName = 'Don hang';
+    var firstProductName = 'Đơn hàng';
+    var itemCount = 0;
+
     final itemsValue = map['items'];
+
     if (itemsValue is Map<dynamic, dynamic>) {
+      itemCount = itemsValue.length;
+
       for (final value in itemsValue.values) {
         if (value is Map<dynamic, dynamic>) {
           final sellerId = value['sellerId']?.toString() ?? '';
+
           if (sellerId.isNotEmpty) {
             sellerIds.add(sellerId);
           }
-          firstProductName = value['productName']?.toString() ?? firstProductName;
+
+          firstProductName =
+              value['productName']?.toString() ?? firstProductName;
         }
       }
     }
@@ -193,22 +226,26 @@ class SellerOrderModel {
       createdAt: _readInt(map['createdAt']),
       sellerIds: sellerIds,
       firstProductName: firstProductName,
+      itemCount: itemCount,
     );
   }
 
   String get statusLabel {
     switch (status) {
       case 'confirmed':
-        return 'Cho lay hang';
+        return 'Đã xác nhận';
+      case 'packed':
+        return 'Đang đóng gói';
       case 'shipping':
-        return 'Cho giao hang';
+        return 'Đang giao hàng';
+      case 'delivered':
       case 'completed':
-        return 'Da giao';
+        return 'Đã giao';
       case 'cancelled':
-        return 'Da huy';
+        return 'Đã hủy';
       case 'pending':
       default:
-        return 'Cho xac nhan';
+        return 'Chờ xác nhận';
     }
   }
 }
@@ -231,10 +268,11 @@ class SellerCustomerConversationModel {
     Map<dynamic, dynamic> map,
   ) {
     final customerName = map['customerName']?.toString().trim() ?? '';
+
     return SellerCustomerConversationModel(
       customerId: customerId,
       customerName:
-          customerName.isEmpty ? 'Khach hang $customerId' : customerName,
+          customerName.isEmpty ? 'Khách hàng $customerId' : customerName,
       lastMessage: map['lastMessage']?.toString() ?? '',
       updatedAt: _readInt(map['updatedAt']),
     );
@@ -273,24 +311,14 @@ class SellerCustomerMessageModel {
 }
 
 double _readDouble(Object? value) {
-  if (value is num) {
-    return value.toDouble();
-  }
-  if (value is String) {
-    return double.tryParse(value) ?? 0;
-  }
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
   return 0;
 }
 
 int _readInt(Object? value) {
-  if (value is int) {
-    return value;
-  }
-  if (value is num) {
-    return value.toInt();
-  }
-  if (value is String) {
-    return int.tryParse(value) ?? 0;
-  }
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
   return 0;
 }

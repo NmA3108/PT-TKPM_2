@@ -19,15 +19,19 @@ class SellerOrderManagementScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(title: const Text('Quan ly don ban')),
+      appBar: AppBar(
+        title: const Text('Quản lý đơn bán'),
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+      ),
       body: sellerId == null
-          ? const _MessageState(message: 'Vui long dang nhap.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập.')
           : StreamBuilder<List<SellerOrderModel>>(
               stream: _service.watchSellerOrders(sellerId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai don ban.\n${snapshot.error}',
+                    message: 'Không thể tải đơn bán.\n${snapshot.error}',
                   );
                 }
 
@@ -36,8 +40,9 @@ class SellerOrderManagementScreen extends StatelessWidget {
                 }
 
                 final orders = snapshot.data ?? const <SellerOrderModel>[];
+
                 if (orders.isEmpty) {
-                  return const _MessageState(message: 'Chua co don ban nao.');
+                  return const _MessageState(message: 'Chưa có đơn bán nào.');
                 }
 
                 return ListView.separated(
@@ -47,7 +52,9 @@ class SellerOrderManagementScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     return _SellerOrderCard(
                       order: orders[index],
-                      onConfirm: () => _confirmOrder(context, orders[index]),
+                      onUpdateStatus: (newStatus) {
+                        _updateOrderStatus(context, orders[index], newStatus);
+                      },
                     );
                   },
                 );
@@ -56,24 +63,24 @@ class SellerOrderManagementScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmOrder(
+  Future<void> _updateOrderStatus(
     BuildContext context,
     SellerOrderModel order,
+    String newStatus,
   ) async {
     try {
-      await _service.confirmSellerOrder(order);
-      if (!context.mounted) {
-        return;
-      }
+      await _service.updateSellerOrderStatus(order, newStatus);
+
+      if (!context.mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Da xac nhan don hang.')),
+        const SnackBar(content: Text('Đã cập nhật trạng thái đơn hàng.')),
       );
     } catch (error) {
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Xac nhan that bai: $error')),
+        SnackBar(content: Text('Cập nhật thất bại: $error')),
       );
     }
   }
@@ -82,19 +89,29 @@ class SellerOrderManagementScreen extends StatelessWidget {
 class _SellerOrderCard extends StatelessWidget {
   const _SellerOrderCard({
     required this.order,
-    required this.onConfirm,
+    required this.onUpdateStatus,
   });
 
   final SellerOrderModel order;
-  final VoidCallback onConfirm;
+  final ValueChanged<String> onUpdateStatus;
 
   @override
   Widget build(BuildContext context) {
+    final nextStatus = _getNextStatus(order.status);
+    final nextStatusLabel = _getNextStatusLabel(order.status);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _surfaceColor,
         borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,37 +120,138 @@ class _SellerOrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Don #${order.id}',
+                  'Đơn #${order.id}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
+              _StatusBadge(status: order.statusLabel),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            order.firstProductName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${order.itemCount} sản phẩm',
+            style: const TextStyle(color: Colors.black54),
+          ),
+          const Divider(height: 24),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Tổng tiền',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
               Text(
-                order.statusLabel,
+                _formatCurrency(order.grandTotal),
                 style: const TextStyle(
                   color: _accentColor,
+                  fontSize: 17,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(order.firstProductName),
-          const SizedBox(height: 8),
-          Text('Tong tien: ${_formatCurrency(order.grandTotal)}'),
-          if (order.canConfirm) ...[
+          if (nextStatus != null) ...[
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: onConfirm,
-                style: FilledButton.styleFrom(backgroundColor: _accentColor),
-                child: const Text('Xac nhan don hang'),
+                onPressed: () => onUpdateStatus(nextStatus),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(nextStatusLabel),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  'Đơn hàng đã hoàn tất',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  String? _getNextStatus(String status) {
+    switch (status) {
+      case 'pending':
+        return 'confirmed';
+      case 'confirmed':
+        return 'packed';
+      case 'packed':
+        return 'shipping';
+      case 'shipping':
+        return 'delivered';
+      default:
+        return null;
+    }
+  }
+
+  String _getNextStatusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Xác nhận đơn hàng';
+      case 'confirmed':
+        return 'Chuyển sang đang đóng gói';
+      case 'packed':
+        return 'Chuyển sang đang giao hàng';
+      case 'shipping':
+        return 'Xác nhận đã giao hàng';
+      default:
+        return 'Cập nhật trạng thái';
+    }
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _accentColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status,
+        style: const TextStyle(
+          color: _accentColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -158,12 +276,15 @@ class _MessageState extends StatelessWidget {
 String _formatCurrency(double value) {
   final rounded = value.round().toString();
   final buffer = StringBuffer();
+
   for (var index = 0; index < rounded.length; index++) {
     final fromEnd = rounded.length - index;
     buffer.write(rounded[index]);
+
     if (fromEnd > 1 && fromEnd % 3 == 1) {
       buffer.write('.');
     }
   }
-  return '${buffer}d';
+
+  return '${buffer}đ';
 }
