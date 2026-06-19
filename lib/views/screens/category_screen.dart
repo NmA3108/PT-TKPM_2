@@ -5,6 +5,7 @@ import '../../models/product_model.dart';
 import '../../services/product_service.dart';
 import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/app_asset_icon.dart';
 import '../widgets/chatbot_floating_button.dart';
 import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
@@ -73,7 +74,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     return ChoiceChip(
                       selected: category == selected,
                       label: Text(category),
-                      avatar: const Icon(Icons.category_outlined, size: 16),
+                      avatar: const AppAssetIcon(
+                        assetName: 'category_icon.jpg',
+                        size: 16,
+                      ),
                       onSelected: (_) {
                         setState(() => _selectedCategory = category);
                       },

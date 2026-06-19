@@ -27,22 +27,22 @@ class _SellerPromotionManagementScreenState
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(title: const Text('Quan ly khuyen mai')),
+      appBar: AppBar(title: const Text('Quản lý khuyến mãi')),
       floatingActionButton: sellerId == null
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _openPromotionForm(sellerId),
               icon: const Icon(Icons.add),
-              label: const Text('Tao khuyen mai'),
+              label: const Text('Tạo khuyến mãi'),
             ),
       body: sellerId == null
-          ? const _MessageState(message: 'Vui long dang nhap.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập.')
           : StreamBuilder<List<SellerPromotionModel>>(
               stream: _service.watchPromotions(sellerId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai khuyen mai.\n${snapshot.error}',
+                    message: 'Không thể tải khuyến mãi.\n${snapshot.error}',
                   );
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -51,7 +51,7 @@ class _SellerPromotionManagementScreenState
 
                 final promotions = snapshot.data ?? const <SellerPromotionModel>[];
                 if (promotions.isEmpty) {
-                  return const _MessageState(message: 'Chua co khuyen mai.');
+                  return const _MessageState(message: 'Chưa có khuyến mãi.');
                 }
 
                 return ListView.separated(
@@ -93,12 +93,12 @@ class _SellerPromotionManagementScreenState
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Da tao khuyen mai.')),
+        const SnackBar(content: Text('Đã tạo khuyến mãi.')),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tao khuyen mai that bai: $error')),
+        SnackBar(content: Text('Tạo khuyến mãi thất bại: $error')),
       );
     }
   }
@@ -115,7 +115,7 @@ class _SellerPromotionManagementScreenState
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cap nhat that bai: $error')),
+        SnackBar(content: Text('Cập nhật thất bại: $error')),
       );
     }
   }
@@ -145,7 +145,7 @@ class _PromotionCard extends StatelessWidget {
           child: const Icon(Icons.local_offer_outlined),
         ),
         title: Text(promotion.title.isEmpty ? promotion.code : promotion.title),
-        subtitle: Text('${promotion.code} - Giam $value'),
+        subtitle: Text('${promotion.code} - Giảm $value'),
         trailing: Switch(
           value: promotion.isActive,
           onChanged: (_) => onToggle(),
@@ -193,25 +193,25 @@ class _PromotionFormSheetState extends State<_PromotionFormSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Tao khuyen mai', style: Theme.of(context).textTheme.titleLarge),
+              Text('Tạo Voucher', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _codeController,
-                decoration: const InputDecoration(labelText: 'Ma khuyen mai'),
+                decoration: const InputDecoration(labelText: 'Nhập mã'),
                 textCapitalization: TextCapitalization.characters,
                 validator: _required,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Ten chuong trinh'),
+                decoration: const InputDecoration(labelText: 'Tên chương trình'),
                 validator: _required,
               ),
               const SizedBox(height: 12),
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'percent', label: Text('Phan tram')),
-                  ButtonSegment(value: 'amount', label: Text('So tien')),
+                  ButtonSegment(value: 'percent', label: Text('%')),
+                  ButtonSegment(value: 'amount', label: Text('Số tiền')),
                 ],
                 selected: {_discountType},
                 onSelectionChanged: (value) {
@@ -224,15 +224,15 @@ class _PromotionFormSheetState extends State<_PromotionFormSheet> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: _discountType == 'percent'
-                      ? 'Gia tri (%)'
-                      : 'Gia tri (VND)',
+                      ? 'Giá trị (%)'
+                      : 'Giá trị (VND)',
                 ),
                 validator: _number,
               ),
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: _submit,
-                child: const Text('Luu khuyen mai'),
+                child: const Text('Lưu khuyến mãi'),
               ),
             ],
           ),
@@ -258,7 +258,7 @@ class _PromotionFormSheetState extends State<_PromotionFormSheet> {
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap thong tin.';
+      return 'Vui lòng nhập thông tin.';
     }
     return null;
   }
@@ -268,10 +268,10 @@ class _PromotionFormSheetState extends State<_PromotionFormSheet> {
     if (error != null) return error;
     final number = double.tryParse(value!.trim());
     if (number == null || number <= 0) {
-      return 'Gia tri khong hop le.';
+      return 'Giá trị không hợp lệ.';
     }
     if (_discountType == 'percent' && number > 100) {
-      return 'Phan tram khong duoc vuot qua 100.';
+      return 'Phần trăm không được vượt quá 100.';
     }
     return null;
   }

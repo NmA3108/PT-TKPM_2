@@ -39,7 +39,7 @@ class ProductOptionsSection extends StatelessWidget {
         children: [
           if (product.classifications.isNotEmpty) ...[
             _OptionRow(
-              label: 'Phan loai',
+              label: 'Phân loại',
               child: _OptionChips(
                 values: product.classifications,
                 selectedValue: selectedClassification,
@@ -50,7 +50,7 @@ class ProductOptionsSection extends StatelessWidget {
           ],
           if (colors.isNotEmpty) ...[
             _OptionRow(
-              label: 'Mau sac',
+              label: 'Màu sắc',
               child: _OptionChips(
                 values: colors,
                 selectedValue: selectedColor,
@@ -61,7 +61,7 @@ class ProductOptionsSection extends StatelessWidget {
           ],
           if (sizes.isNotEmpty) ...[
             _OptionRow(
-              label: 'Kich co',
+              label: 'Kích cỡ',
               child: _OptionChips(
                 values: sizes,
                 selectedValue: selectedSize,
@@ -71,7 +71,7 @@ class ProductOptionsSection extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           _OptionRow(
-            label: 'So luong',
+            label: 'Số lượng',
             child: _QuantityControl(
               quantity: quantity,
               canDecrease: quantity > 1,

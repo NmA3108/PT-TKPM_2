@@ -84,12 +84,12 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
                           TextButton.icon(
                             onPressed: () => _addAddress(userId),
                             icon: const Icon(Icons.add_location_alt_outlined),
-                            label: const Text('Them'),
+                            label: const Text('Thêm địa chỉ'),
                           ),
                           if (addresses.isNotEmpty)
                             TextButton(
                               onPressed: () => _selectAddress(addresses),
-                              child: const Text('Doi'),
+                              child: const Text('Đổi địa chỉ'),
                             ),
                         ],
                       ),
@@ -97,12 +97,12 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
                           ? Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Ban chua co dia chi nhan hang.'),
+                                const Text('Bạn chưa có địa chỉ nhận hàng.'),
                                 const SizedBox(height: 10),
                                 OutlinedButton.icon(
                                   onPressed: () => _addAddress(userId),
                                   icon: const Icon(Icons.add),
-                                  label: const Text('Them dia chi'),
+                                  label: const Text('Thêm địa chỉ'),
                                 ),
                               ],
                             )
@@ -300,7 +300,10 @@ class _OrderCheckoutScreenState extends State<OrderCheckoutScreen> {
   Future<void> _applyVoucherAsync() async {
     final code = _voucherController.text.trim().toUpperCase();
     final sellerIds = widget.items
-        .map((item) => item.sellerId.trim())
+        .map((item) {
+          final sellerId = item.sellerId.trim();
+          return sellerId.isNotEmpty ? sellerId : item.shopId.trim();
+        })
         .where((sellerId) => sellerId.isNotEmpty)
         .toSet();
     final promotion = await _promotionService.findActivePromotion(
@@ -404,7 +407,7 @@ class _CheckoutAddressSheetState extends State<_CheckoutAddressSheet> {
               TextFormField(
                 controller: _receiverController,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Nguoi nhan'),
+                decoration: const InputDecoration(labelText: 'Người nhận'),
                 validator: _required,
               ),
               const SizedBox(height: 12),
@@ -412,7 +415,7 @@ class _CheckoutAddressSheetState extends State<_CheckoutAddressSheet> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'So dien thoai'),
+                decoration: const InputDecoration(labelText: 'Số điện thoại'),
                 validator: _required,
               ),
               const SizedBox(height: 12),
@@ -420,13 +423,13 @@ class _CheckoutAddressSheetState extends State<_CheckoutAddressSheet> {
                 controller: _addressController,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Dia chi chi tiet'),
+                decoration: const InputDecoration(labelText: 'Địa chỉ chi tiết'),
                 validator: _required,
               ),
               const SizedBox(height: 18),
               FilledButton(
                 onPressed: _submit,
-                child: const Text('Luu dia chi'),
+                child: const Text('Lưu địa chỉ'),
               ),
             ],
           ),
@@ -451,7 +454,7 @@ class _CheckoutAddressSheetState extends State<_CheckoutAddressSheet> {
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap thong tin.';
+      return 'Vui lòng nhập thông tin.';
     }
     return null;
   }
@@ -677,5 +680,5 @@ String _optionText(CartItemModel item) {
     item.selectedColor,
     item.selectedSize,
   ].where((value) => value.trim().isNotEmpty).toList();
-  return values.isEmpty ? 'Mac dinh' : values.join(' • ');
+  return values.isEmpty ? 'Mặc định' : values.join(' • ');
 }

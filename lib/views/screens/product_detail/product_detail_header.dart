@@ -8,11 +8,17 @@ class ProductDetailHeader extends StatefulWidget {
   const ProductDetailHeader({
     super.key,
     required this.product,
+    required this.cartCount,
     required this.onBack,
+    required this.onCartTap,
+    required this.onMoreTap,
   });
 
   final ProductDetailModel product;
+  final int cartCount;
   final VoidCallback onBack;
+  final VoidCallback onCartTap;
+  final VoidCallback onMoreTap;
 
   @override
   State<ProductDetailHeader> createState() => _ProductDetailHeaderState();
@@ -60,6 +66,25 @@ class _ProductDetailHeaderState extends State<ProductDetailHeader> {
             ),
           ),
           Positioned(
+            right: 12,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _HeaderButton(
+                  icon: Icons.shopping_cart, // Thay 'cart.jpg' bằng Icon hệ thống tại đây
+                  badge: widget.cartCount,
+                  onPressed: widget.onCartTap,
+                ),
+                const SizedBox(width: 10),
+                _HeaderButton(
+                  icon: Icons.more_vert,
+                  onPressed: widget.onMoreTap,
+                ),
+              ],
+            ),
+          ),
+          Positioned(
             right: 18,
             bottom: 18,
             child: Container(
@@ -82,22 +107,56 @@ class _ProductDetailHeaderState extends State<ProductDetailHeader> {
 
 class _HeaderButton extends StatelessWidget {
   const _HeaderButton({
-    required this.icon,
     required this.onPressed,
+    required this.icon, // Đổi thành thuộc tính bắt buộc (required)
+    this.badge = 0,
   });
 
-  final IconData icon;
+  final IconData icon; // Loại bỏ biến assetName không cần thiết
   final VoidCallback onPressed;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withOpacity(0.34),
-      shape: const CircleBorder(),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white),
-      ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: Colors.black.withOpacity(0.34),
+          shape: const CircleBorder(),
+          child: IconButton(
+            onPressed: onPressed,
+            icon: Icon(
+              icon, 
+              color: Colors.white,
+              size: 22, // Giữ nguyên kích thước hiển thị đồng bộ
+            ),
+          ),
+        ),
+        if (badge > 0)
+          Positioned(
+            right: -2,
+            top: -4,
+            child: Container(
+              height: 20,
+              constraints: const BoxConstraints(minWidth: 20),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ProductDetailColors.accent,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : '$badge',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

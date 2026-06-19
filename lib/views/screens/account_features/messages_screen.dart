@@ -22,15 +22,15 @@ class MessagesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: _backgroundColor,
       bottomNavigationBar: const AppBottomNavBar(currentIndex: 1),
-      appBar: AppBar(title: const Text('Tin nhan')),
+      appBar: AppBar(title: const Text('Tin nhắn')),
       body: userId == null
-          ? const _MessageState(message: 'Vui long dang nhap de xem tin nhan.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập để xem tin nhắn.')
           : StreamBuilder<List<SellerConversationModel>>(
               stream: _service.watchSellerConversations(userId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai tin nhan.\n${snapshot.error}',
+                    message: 'Không thể tải tin nhắn.\n${snapshot.error}',
                   );
                 }
 
@@ -42,7 +42,7 @@ class MessagesScreen extends StatelessWidget {
                     snapshot.data ?? const <SellerConversationModel>[];
                 if (conversations.isEmpty) {
                   return const _MessageState(
-                    message: 'Ban chua co tin nhan voi seller nao.',
+                    message: 'Bạn chưa có tin nhắn nào.',
                   );
                 }
 

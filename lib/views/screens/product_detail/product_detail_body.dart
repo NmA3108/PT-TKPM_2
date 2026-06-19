@@ -14,6 +14,10 @@ class ProductDetailBody extends StatelessWidget {
     required this.selectedClassification,
     required this.selectedSize,
     required this.onBack,
+    required this.cartCount,
+    required this.onCartTap,
+    required this.onMoreTap,
+    required this.onOpenShop,
     required this.onColorSelected,
     required this.onClassificationSelected,
     required this.onSizeSelected,
@@ -27,6 +31,10 @@ class ProductDetailBody extends StatelessWidget {
   final String selectedClassification;
   final String selectedSize;
   final VoidCallback onBack;
+  final int cartCount;
+  final VoidCallback onCartTap;
+  final VoidCallback onMoreTap;
+  final VoidCallback onOpenShop;
   final ValueChanged<String> onColorSelected;
   final ValueChanged<String> onClassificationSelected;
   final ValueChanged<String> onSizeSelected;
@@ -41,7 +49,13 @@ class ProductDetailBody extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ProductDetailHeader(product: product, onBack: onBack),
+            ProductDetailHeader(
+              product: product,
+              cartCount: cartCount,
+              onBack: onBack,
+              onCartTap: onCartTap,
+              onMoreTap: onMoreTap,
+            ),
             ProductInfoSection(product: product),
             ProductOptionsSection(
               product: product,
@@ -55,8 +69,7 @@ class ProductDetailBody extends StatelessWidget {
               onDecreaseQuantity: onDecreaseQuantity,
               onIncreaseQuantity: onIncreaseQuantity,
             ),
-            // SHOP DEBUG: hidden temporarily to verify whether shop UI causes blank detail page.
-            // ProductShopSection(product: product, onOpenShop: onOpenShop),
+            ProductShopSection(product: product, onOpenShop: onOpenShop),
             ProductShippingSection(),
             ProductPolicySection(),
             ProductDescriptionSection(product: product),

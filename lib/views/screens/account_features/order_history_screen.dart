@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/providers/auth_provider.dart';
-import 'account_feature_service.dart';
+import '../../../utils/currency_formatter.dart';
 import '../order_tracking_screen.dart';
+import 'account_feature_service.dart';
 
 const _backgroundColor = Color(0xFFF5F7FB);
 const _surfaceColor = Color(0xFFFFFFFF);
@@ -12,9 +13,16 @@ const _secondaryTextColor = Color(0xFF6B7280);
 const _accentColor = Color(0xFFFF4D2D);
 
 class OrderHistoryScreen extends StatelessWidget {
-  const OrderHistoryScreen({super.key});
+  const OrderHistoryScreen({
+    super.key,
+    this.statuses = const <String>{},
+    this.title = 'Lịch sử mua hàng',
+  });
 
   static final _service = AccountFeatureService();
+
+  final Set<String> statuses;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +31,14 @@ class OrderHistoryScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Lịch sử mua hàng'),
+        title: Text(title),
         backgroundColor: _backgroundColor,
         elevation: 0,
       ),
       body: userId == null
-          ? const _MessageState(message: 'Vui lòng đăng nhập để xem đơn hàng.')
+          ? const _MessageState(
+              message: 'Vui lòng đăng nhập để xem đơn hàng.',
+            )
           : StreamBuilder<List<CustomerOrderModel>>(
               stream: _service.watchCustomerOrders(userId),
               builder: (context, snapshot) {
@@ -42,11 +52,18 @@ class OrderHistoryScreen extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final orders = snapshot.data ?? const <CustomerOrderModel>[];
+                final allOrders = snapshot.data ?? const <CustomerOrderModel>[];
+                final orders = statuses.isEmpty
+                    ? allOrders
+                    : allOrders
+                        .where((order) => statuses.contains(order.status))
+                        .toList();
 
                 if (orders.isEmpty) {
-                  return const _MessageState(
-                    message: 'Bạn chưa có đơn hàng nào.',
+                  return _MessageState(
+                    message: statuses.isEmpty
+                        ? 'Bạn chưa có đơn hàng nào.'
+                        : 'Chưa có đơn hàng trong trạng thái này.',
                   );
                 }
 
@@ -56,13 +73,12 @@ class OrderHistoryScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final order = orders[index];
-
                     return _OrderCard(
                       order: order,
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
+                          MaterialPageRoute<void>(
                             builder: (_) => OrderTrackingScreen(order: order),
                           ),
                         );
@@ -110,7 +126,7 @@ class _OrderCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Đơn #${order.id}',
+                    'Đơn hàng#${order.id}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -148,7 +164,7 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _formatCurrency(order.grandTotal),
+                  formatVnd(order.grandTotal),
                   style: const TextStyle(
                     color: _accentColor,
                     fontSize: 17,
@@ -207,36 +223,16 @@ class _MessageState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-        ),
+        child: Text(message, textAlign: TextAlign.center),
       ),
     );
   }
-}
-
-String _formatCurrency(double value) {
-  final rounded = value.round().toString();
-  final buffer = StringBuffer();
-
-  for (var index = 0; index < rounded.length; index++) {
-    final fromEnd = rounded.length - index;
-    buffer.write(rounded[index]);
-
-    if (fromEnd > 1 && fromEnd % 3 == 1) {
-      buffer.write('.');
-    }
-  }
-
-  return '${buffer}đ';
 }
 
 String _formatDate(int millis) {
   if (millis <= 0) return '--';
 
   final date = DateTime.fromMillisecondsSinceEpoch(millis);
-
   return '${date.day.toString().padLeft(2, '0')}/'
       '${date.month.toString().padLeft(2, '0')}/${date.year}';
 }

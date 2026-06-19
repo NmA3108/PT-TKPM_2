@@ -378,11 +378,17 @@ class SellerProductTaxonomy {
 
   bool get isCategory => type == 'category';
   bool get isClassification => type == 'classification';
+  bool get isSize => type == 'size';
 
   static String normalizeType(String value) {
-    return value.trim().toLowerCase() == 'classification'
-        ? 'classification'
-        : 'category';
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'classification') {
+      return 'classification';
+    }
+    if (normalized == 'size') {
+      return 'size';
+    }
+    return 'category';
   }
 
   factory SellerProductTaxonomy.fromMap(

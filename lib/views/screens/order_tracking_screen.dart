@@ -100,7 +100,7 @@ class _OrderInfoCard extends StatelessWidget {
     final total = order == null ? _formatCurrency(345000) : _formatCurrency(order!.grandTotal);
     final date = order == null ? '17 Jun 2026' : _formatDate(order!.createdAt);
     final product = order?.firstProductName ?? 'Demo product';
-    final status = order?.statusLabel ?? 'Cho xac nhan';
+    final status = order?.statusLabel ?? 'Chờ xác nhận';
 
     return Container(
       padding: const EdgeInsets.all(18),

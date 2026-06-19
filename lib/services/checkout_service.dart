@@ -53,7 +53,7 @@ class CheckoutService {
 
     final stock = await _readProductStock(item.productId);
     if (quantity > stock) {
-      throw const CheckoutException('So luong yeu cau vuot qua ton kho.');
+      throw const CheckoutException('Số lượng yêu cầu vượt quá tồn kho.');
     }
 
     await _cartItemsRef(userId).doc(item.cartItemId).set(
@@ -101,7 +101,7 @@ class CheckoutService {
     required CheckoutDraft draft,
   }) async {
     if (draft.items.isEmpty) {
-      throw const CheckoutException('Gio hang dang trong.');
+      throw const CheckoutException('Giỏ hàng đang trống.');
     }
 
     final quantitiesByProduct = <String, int>{};
@@ -117,7 +117,7 @@ class CheckoutService {
       final stock = await _readProductStock(entry.key);
       if (entry.value > stock) {
         throw CheckoutException(
-          '${namesByProduct[entry.key] ?? 'San pham'} khong du so luong ton kho.',
+          '${namesByProduct[entry.key] ?? 'Sản phẩm'} không đủ số lượng tồn kho.',
         );
       }
       nextStocks[entry.key] = stock - entry.value;
@@ -197,7 +197,7 @@ class CheckoutService {
     final snapshot = await _productsRef.doc(productId).get();
     final value = snapshot.data();
     if (value == null || value['status'] != 'active') {
-      throw const CheckoutException('San pham khong con ton tai.');
+      throw const CheckoutException('Sản phẩm không còn tồn tại.');
     }
 
     final stockValue = value['stock_quantity'] ?? value['stock'];

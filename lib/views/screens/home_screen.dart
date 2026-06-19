@@ -6,6 +6,7 @@ import '../../models/product_model.dart';
 import '../../services/product_service.dart';
 import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/app_asset_icon.dart';
 import '../widgets/chatbot_floating_button.dart';
 import '../widgets/product_image.dart';
 import 'product_detail_screen.dart';
@@ -70,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _showSuggestions = focused);
                   },
                   onSuggestionSelected: _selectSuggestion,
+                  onBackHome: _resetSearch,
                   onFilterTap: _openPriceFilter,
                   onSortChanged: (value) {
                     if (value == null) return;
@@ -117,17 +119,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         if (_submittedKeyword.isNotEmpty)
                           _HorizontalProductSection(
-                            title: 'Ket qua tim kiem',
+                            title: 'Kết quả tìm kiếm',
                             products: products.take(12).toList(),
                           )
                         else ...[
                           _HorizontalProductSection(
-                            title: 'Moi nhat',
+                            title: 'Mới nhất',
                             products: products.take(8).toList(),
                           ),
                           const SizedBox(height: 28),
                           _HorizontalProductSection(
-                            title: 'Noi bat',
+                            title: 'Nổi bật',
                             products: popularProducts.take(8).toList(),
                           ),
                         ],
@@ -170,6 +172,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void _selectSuggestion(String keyword) {
     _searchController.text = keyword;
     _submitSearch(keyword);
+  }
+
+  void _resetSearch() {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _draftKeyword = '';
+      _submittedKeyword = '';
+      _sortMode = 'relevance';
+      _minPrice = null;
+      _maxPrice = null;
+      _showSuggestions = false;
+    });
   }
 
   List<ProductModel> _applySearchTools(List<ProductModel> products) {
@@ -229,6 +244,7 @@ class _HomeHeader extends StatelessWidget {
     required this.onSubmitted,
     required this.onFocusChanged,
     required this.onSuggestionSelected,
+    required this.onBackHome,
     required this.onFilterTap,
     required this.onSortChanged,
   });
@@ -244,6 +260,7 @@ class _HomeHeader extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
   final ValueChanged<bool> onFocusChanged;
   final ValueChanged<String> onSuggestionSelected;
+  final VoidCallback onBackHome;
   final VoidCallback onFilterTap;
   final ValueChanged<String?> onSortChanged;
 
@@ -264,7 +281,7 @@ class _HomeHeader extends StatelessWidget {
                 focusNode: focusNode,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Tim kiem...',
+                  hintText: 'Tìm kiếm...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: keyword.isEmpty
                       ? null
@@ -288,36 +305,42 @@ class _HomeHeader extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
+              ActionChip(
+                avatar: const AppAssetIcon(assetName: 'home.jpg', size: 18),
+                label: const Text('Trang chủ'),
+                onPressed: onBackHome,
+              ),
+              const SizedBox(width: 10),
               FilterChip(
                 selected: hasPriceFilter,
                 onSelected: (_) => onFilterTap(),
                 avatar: const Icon(Icons.tune_rounded, size: 18),
-                label: const Text('Loc gia'),
+                label: const Text('Lọc'),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: sortMode,
                   decoration: const InputDecoration(
-                    labelText: 'Sap xep',
+                    labelText: 'Sắp xếp',
                     isDense: true,
                   ),
                   items: const [
                     DropdownMenuItem(
                       value: 'relevance',
-                      child: Text('Lien quan'),
+                      child: Text('Lượt mua'),
                     ),
                     DropdownMenuItem(
                       value: 'priceAsc',
-                      child: Text('Gia tang dan'),
+                      child: Text('Giá tăng dần'),
                     ),
                     DropdownMenuItem(
                       value: 'priceDesc',
-                      child: Text('Gia giam dan'),
+                      child: Text('Giá giảm dần'),
                     ),
                     DropdownMenuItem(
                       value: 'rating',
-                      child: Text('Danh gia cao'),
+                      child: Text('Đánh giá cao'),
                     ),
                   ],
                   onChanged: onSortChanged,
@@ -396,7 +419,7 @@ class _PriceFilterSheetState extends State<_PriceFilterSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Loc theo gia', style: Theme.of(context).textTheme.titleLarge),
+          Text('Lọc theo khoảng giá', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           Text('${formatVnd(_values.start)} - ${formatVnd(_values.end)}'),
           RangeSlider(
@@ -423,7 +446,7 @@ class _PriceFilterSheetState extends State<_PriceFilterSheet> {
                       ),
                     );
                   },
-                  child: const Text('Xoa loc'),
+                  child: const Text('Xóa lọc'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -437,7 +460,7 @@ class _PriceFilterSheetState extends State<_PriceFilterSheet> {
                       ),
                     );
                   },
-                  child: const Text('Ap dung'),
+                  child: const Text('Áp dụng'),
                 ),
               ),
             ],
@@ -579,7 +602,7 @@ class _HorizontalProductSection extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   minimumSize: const Size(76, 34),
                 ),
-                child: const Text('View all'),
+                child: const Text('Xem thêm'),
               ),
             ],
           ),

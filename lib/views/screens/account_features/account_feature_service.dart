@@ -253,16 +253,19 @@ class CustomerOrderModel {
   String get statusLabel {
     switch (status) {
       case 'confirmed':
-        return 'Cho lay hang';
+        return 'Chờ lấy hàng';
+      case 'packed':
+        return 'Đang đóng gói';
       case 'shipping':
-        return 'Cho giao hang';
+        return 'Đang giao hàng';
+      case 'delivered':
       case 'completed':
-        return 'Da giao';
+        return 'Đã giao';
       case 'cancelled':
-        return 'Da huy';
+        return 'Đã hủy';
       case 'pending':
       default:
-        return 'Cho xac nhan';
+        return 'Chờ xác nhận';
     }
   }
 }
@@ -286,11 +289,27 @@ class SellerConversationModel {
   ) {
     return SellerConversationModel(
       sellerId: sellerId,
-      sellerName: map['sellerName']?.toString() ?? 'Seller $sellerId',
+      sellerName: _sellerDisplayName(sellerId, map['sellerName']),
       lastMessage: map['lastMessage']?.toString() ?? '',
       updatedAt: _readInt(map['updatedAt']),
     );
   }
+}
+
+String _sellerDisplayName(String sellerId, Object? value) {
+  final name = value?.toString().trim() ?? '';
+  if (name.isNotEmpty && !_looksLikeRawSellerId(name, sellerId)) {
+    return name;
+  }
+  final digits = (sellerId.hashCode.abs() % 1000).toString().padLeft(3, '0');
+  return 'Seller$digits';
+}
+
+bool _looksLikeRawSellerId(String name, String sellerId) {
+  final normalized = name.trim();
+  return normalized == sellerId ||
+      normalized == 'Seller $sellerId' ||
+      normalized == 'Shop $sellerId';
 }
 
 class SellerOrderModel {

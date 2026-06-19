@@ -53,9 +53,9 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(title: const Text('Dang ky ban hang')),
+      appBar: AppBar(title: const Text('Đăng ký bán hàng')),
       body: user == null
-          ? const _MessageState(message: 'Vui long dang nhap de dang ky.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập để đăng ký.')
           : isSeller
               ? _ApprovedSellerPanel(
                   onOpenSeller: () {
@@ -70,9 +70,9 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                   children: [
                     _InfoCard(
-                      title: 'Quy trinh xet duyet',
+                      title: 'Quy trình xét duyệt',
                       content:
-                          'Sau khi gui don, admin se xem xet thong tin cua ban. Chi khi don duoc duyet, tai khoan moi co quyen truy cap cac chuc nang Seller.',
+                          'Sau khi gửi đơn, admin sẽ xem xét thông tin của bạn. Chỉ khi đơn được duyệt, tài khoản mới có quyền truy cập các chức năng Seller.',
                     ),
                     const SizedBox(height: 14),
                     Container(
@@ -88,7 +88,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                             TextFormField(
                               controller: _fullNameController,
                               decoration: const InputDecoration(
-                                labelText: 'Ho ten nguoi dai dien',
+                                labelText: 'Họ tên người đại diện',
                                 prefixIcon: Icon(Icons.person_outline),
                               ),
                               validator: _requiredValidator,
@@ -98,7 +98,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
                               decoration: const InputDecoration(
-                                labelText: 'So dien thoai',
+                                labelText: 'Số điện thoại',
                                 prefixIcon: Icon(Icons.phone_outlined),
                               ),
                               validator: _requiredValidator,
@@ -107,7 +107,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                             TextFormField(
                               controller: _shopNameController,
                               decoration: const InputDecoration(
-                                labelText: 'Ten shop',
+                                labelText: 'Tên shop',
                                 prefixIcon: Icon(Icons.storefront_outlined),
                               ),
                               validator: _requiredValidator,
@@ -118,7 +118,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                               minLines: 2,
                               maxLines: 3,
                               decoration: const InputDecoration(
-                                labelText: 'Dia chi lay hang',
+                                labelText: 'Địa chỉ lấy hàng',
                                 prefixIcon: Icon(Icons.location_on_outlined),
                               ),
                               validator: _requiredValidator,
@@ -129,7 +129,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                               minLines: 3,
                               maxLines: 5,
                               decoration: const InputDecoration(
-                                labelText: 'Mo ta san pham/cua hang',
+                                labelText: 'Mô tả sản phẩm/cửa hàng',
                                 prefixIcon: Icon(Icons.description_outlined),
                               ),
                               validator: _requiredValidator,
@@ -148,7 +148,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Text('Gui don cho admin'),
+                                  : const Text('Gửi đơn'),
                             ),
                           ],
                         ),
@@ -161,7 +161,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
 
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap thong tin.';
+      return 'Vui lòng nhập thông tin.';
     }
     return null;
   }
@@ -191,7 +191,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Da gui don dang ky cho admin xet duyet.')),
+        const SnackBar(content: Text('Đã gửi đơn đăng ký.')),
       );
       Navigator.of(context).pop();
     } catch (error) {
@@ -199,7 +199,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gui don that bai: $error')),
+        SnackBar(content: Text('Gửi đơn thất bại: $error')),
       );
     } finally {
       if (mounted) {
@@ -225,14 +225,14 @@ class _ApprovedSellerPanel extends StatelessWidget {
             const Icon(Icons.verified, color: Color(0xFF16A34A), size: 58),
             const SizedBox(height: 14),
             const Text(
-              'Tai khoan da co quyen Seller.',
+              'Tài khoản đã có quyền Seller.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: onOpenSeller,
-              child: const Text('Mo kenh nguoi ban'),
+              child: const Text('Mở kênh người bán'),
             ),
           ],
         ),

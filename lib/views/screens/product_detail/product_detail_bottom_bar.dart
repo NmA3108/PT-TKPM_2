@@ -40,16 +40,16 @@ class ProductDetailBottomBar extends StatelessWidget {
             Expanded(
               child: _ActionButton(
                 color: ProductDetailColors.teal,
-                icon: Icons.chat_bubble_outline,
-                label: 'Chat',
+                icon: Icons.chat_outlined, 
+                label: 'Chat ngay',
                 onPressed: isBusy ? null : onChat,
               ),
             ),
             Expanded(
               child: _ActionButton(
                 color: ProductDetailColors.teal,
-                icon: Icons.add_shopping_cart_outlined,
-                label: 'Them gio',
+                icon: Icons.add_shopping_cart,
+                label: 'Thêm vào giỏ',
                 onPressed: isBusy ? null : onAddToCart,
               ),
             ),
@@ -93,13 +93,13 @@ class ProductDetailBottomBar extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.color,
-    required this.icon,
+    required this.icon, // Đổi từ String assetName sang IconData icon
     required this.label,
     required this.onPressed,
   });
 
   final Color color;
-  final IconData icon;
+  final IconData icon; // Đổi kiểu dữ liệu dữ liệu thành IconData
   final String label;
   final VoidCallback? onPressed;
 
@@ -117,13 +117,17 @@ class _ActionButton extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 23),
+          Icon(
+            icon, 
+            size: 23, 
+            color: Colors.white, // Thiết lập màu cho Icon trùng màu chữ
+          ),
           const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 11), // Thu nhỏ chữ lại một chút để tránh tràn hàng khi dùng Icon
           ),
         ],
       ),

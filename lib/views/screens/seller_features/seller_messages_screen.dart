@@ -22,15 +22,15 @@ class SellerMessagesScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(title: const Text('Tin nhan khach hang')),
+      appBar: AppBar(title: const Text('Tin nhắn khách hàng')),
       body: sellerId == null
-          ? const _MessageState(message: 'Vui long dang nhap bang tai khoan seller.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập bằng tài khoản người bán.')
           : StreamBuilder<List<SellerCustomerConversationModel>>(
               stream: _service.watchCustomerConversations(sellerId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai tin nhan.\n${snapshot.error}',
+                    message: 'Không thể tải tin nhắn.\n${snapshot.error}',
                   );
                 }
 
@@ -42,7 +42,7 @@ class SellerMessagesScreen extends StatelessWidget {
                     snapshot.data ?? const <SellerCustomerConversationModel>[];
                 if (conversations.isEmpty) {
                   return const _MessageState(
-                    message: 'Chua co khach hang nao nhan tin.',
+                    message: 'Chưa có khách hàng nào nhận tin.',
                   );
                 }
 
@@ -123,7 +123,7 @@ class _CustomerConversationTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       conversation.lastMessage.isEmpty
-                          ? 'Bat dau hoi thoai'
+                          ? 'Bắt đầu hội thoại'
                           : conversation.lastMessage,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

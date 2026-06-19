@@ -83,7 +83,9 @@ class ProductDetailModel {
       'productId': id,
       'sellerId': sellerId,
       'shopId': shopId,
-      'shopName': shopName,
+      'shopName': shopName.trim().isNotEmpty
+          ? shopName.trim()
+          : _defaultSellerName(sellerId.trim().isNotEmpty ? sellerId : shopId),
       'productName': name,
       'thumbnailUrl': imageUrl,
       'unitPrice': price,
@@ -216,5 +218,13 @@ class ProductDetailModel {
       }
     }
     return value?.toString().trim() ?? '';
+  }
+
+  static String _defaultSellerName(String sellerId) {
+    if (sellerId.trim().isEmpty) {
+      return 'Seller000';
+    }
+    final digits = (sellerId.hashCode.abs() % 1000).toString().padLeft(3, '0');
+    return 'Seller$digits';
   }
 }

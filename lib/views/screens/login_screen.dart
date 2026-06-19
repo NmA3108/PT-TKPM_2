@@ -150,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _validateLoginIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap so dien thoai hoac email.';
+      return 'Vui lòng nhập số điện thoại hoặc email.';
     }
     return null;
   }

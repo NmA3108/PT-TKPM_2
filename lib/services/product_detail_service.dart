@@ -175,7 +175,7 @@ class ProductDetailService {
     final nextQuantity = currentQuantity + quantity;
     if (nextQuantity > product.stockQuantity) {
       throw const ProductStockException(
-        'So luong trong gio hang vuot qua ton kho hien co.',
+        'Sản phẩm đạt số lượng tối đa.',
       );
     }
 

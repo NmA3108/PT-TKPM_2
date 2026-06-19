@@ -100,20 +100,20 @@ class AuthService {
     final normalizedPhone = _normalizeMobileNumber(mobileNumber);
     final normalizedEmail = _normalizeEmail(email ?? '');
     if (normalizedPhone.isEmpty && normalizedEmail.isEmpty) {
-      throw const AuthException('Vui long nhap so dien thoai hoac email.');
+      throw const AuthException('Vui lòng nhập số điện thoại hoặc email.');
     }
 
     if (normalizedPhone.isNotEmpty) {
       final existingUid = await _findUidByPhone(normalizedPhone);
       if (existingUid != null) {
-        throw const AuthException('So dien thoai da duoc dang ky.');
+        throw const AuthException('Số điện thoại đã được đăng ký.');
       }
     }
 
     if (normalizedEmail.isNotEmpty) {
       final existingUid = await _findUidByEmail(normalizedEmail);
       if (existingUid != null) {
-        throw const AuthException('Email da duoc dang ky.');
+        throw const AuthException('Email đã được đăng ký.');
       }
     }
 
@@ -170,18 +170,18 @@ class AuthService {
           )
         : await _findUidByLoginIdentifier(loginIdentifier);
     if (uid == null || uid.isEmpty) {
-      throw const AuthException('Tai khoan hoac mat khau khong dung.');
+      throw const AuthException('Tài khoản hoặc mật khẩu không đúng.');
     }
 
     final userSnapshot = await _usersRef.doc(uid).get();
     final userValue = userSnapshot.data();
 
     if (userValue == null) {
-      throw const AuthException('Tai khoan khong ton tai.');
+      throw const AuthException('Tài khoản không tồn tại.');
     }
 
     if (userValue['status'] != 'active') {
-      throw const AuthException('Tai khoan da bi khoa hoac tam dung.');
+      throw const AuthException('Tài khoản đã bị khóa hoặc tạm dừng.');
     }
 
     final salt = userValue['passwordSalt'] as String? ?? '';
@@ -189,7 +189,7 @@ class AuthService {
     final inputHash = _hashPassword(password, salt);
 
     if (storedHash != inputHash) {
-      throw const AuthException('Tai khoan hoac mat khau khong dung.');
+      throw const AuthException('Tài khoản hoặc mật khẩu không đúng.');
     }
 
     return _userFromMapWithRole(uid, userValue);
@@ -205,7 +205,7 @@ class AuthService {
     final currentSnapshot = await _usersRef.doc(uid).get();
     final currentData = currentSnapshot.data();
     if (currentData == null) {
-      throw const AuthException('Tai khoan khong ton tai.');
+      throw const AuthException('Tài khoản không tồn tại.');
     }
 
     final updates = <String, Object?>{
@@ -220,7 +220,7 @@ class AuthService {
       normalizedEmail = _normalizeEmail(email);
       final existingUid = await _findUidByEmail(normalizedEmail);
       if (existingUid != null && existingUid != uid) {
-        throw const AuthException('Email da duoc dang ky.');
+        throw const AuthException('Email đã được đăng ký.');
       }
       updates['email'] = normalizedEmail;
     }
@@ -255,7 +255,7 @@ class AuthService {
     final value = snapshot.data();
 
     if (value == null) {
-      throw const AuthException('Tai khoan khong ton tai.');
+      throw const AuthException('Tài khoản không tồn tại.');
     }
 
     final salt = value['passwordSalt'] as String? ?? '';
@@ -263,7 +263,7 @@ class AuthService {
     final inputHash = _hashPassword(currentPassword, salt);
 
     if (inputHash != storedHash) {
-      throw const AuthException('Mat khau hien tai khong dung.');
+      throw const AuthException('Mật khẩu hiện tại không đúng.');
     }
 
     final newSalt = _createSalt();
@@ -284,7 +284,7 @@ class AuthService {
     final value = snapshot.data();
 
     if (value == null) {
-      throw const AuthException('Tai khoan khong ton tai.');
+      throw const AuthException('Tài khoản không tồn tại.');
     }
 
     final phone = value['mobileNumber']?.toString();
@@ -309,7 +309,7 @@ class AuthService {
     final value = snapshot.data();
 
     if (value == null) {
-      throw const AuthException('Khong the tai thong tin tai khoan.');
+      throw const AuthException('Không thể tải thông tin tài khoản.');
     }
 
     return _userFromMapWithRole(uid, value);
@@ -439,7 +439,7 @@ class AuthService {
       );
       final user = credential.user;
       if (user == null) {
-        throw const AuthException('Khong the tao tai khoan Firebase Auth.');
+        throw const AuthException('Không thể tạo tài khoản Firebase Auth.');
       }
       return user;
     } on FirebaseAuthException catch (error) {

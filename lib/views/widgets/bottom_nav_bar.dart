@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
+import 'app_asset_icon.dart';
 
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
@@ -32,29 +33,25 @@ class AppBottomNavBar extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
+              assetName: 'home.jpg',
               label: context.tr('home'),
               isActive: currentIndex == 0,
               onTap: () => _open(context, 0),
             ),
             _NavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_rounded,
+              assetName: 'message.jpg',
               label: context.tr('message'),
               isActive: currentIndex == 1,
               onTap: () => _open(context, 1),
             ),
             _NavItem(
-              icon: Icons.shopping_bag_outlined,
-              activeIcon: Icons.shopping_bag_rounded,
+              assetName: 'cart.jpg',
               label: context.tr('cart'),
               isActive: currentIndex == 2,
               onTap: () => _open(context, 2),
             ),
             _NavItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
+              assetName: 'avatardefault.jpg',
               label: context.tr('me'),
               isActive: currentIndex == 3,
               onTap: () => _open(context, 3),
@@ -84,15 +81,13 @@ class AppBottomNavBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
-    required this.icon,
-    required this.activeIcon,
+    required this.assetName,
     required this.label,
     required this.isActive,
     required this.onTap,
   });
 
-  final IconData icon;
-  final IconData activeIcon;
+  final String assetName;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
@@ -109,7 +104,7 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(isActive ? activeIcon : icon, color: color, size: 23),
+            AppAssetIcon(assetName: assetName, size: 23),
             const SizedBox(height: 4),
             Text(
               label,

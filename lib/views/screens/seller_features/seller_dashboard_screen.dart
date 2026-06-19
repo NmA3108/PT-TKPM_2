@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../controllers/providers/auth_provider.dart';
+import '../edit_profile_screen.dart';
 import 'seller_messages_screen.dart';
 import 'seller_order_management_screen.dart';
 import 'seller_product_management_screen.dart';
@@ -43,6 +44,20 @@ class SellerDashboardScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _FeatureGrid(
             items: [
+              _SellerFeature(
+                title: 'Chỉnh sửa thông tin Shop',
+                subtitle: 'Cập nhật tên, email và số điện thoại',
+                icon: Icons.person_outline,
+                onTap: user == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => EditProfileScreen(
+                              currentUid: user.uid,
+                            ),
+                          ),
+                        ),
+              ),
               _SellerFeature(
                 title: 'Quản lý sản phẩm',
                 subtitle: 'Đăng mới, xem danh sách, cập nhật, ẩn sản phẩm',

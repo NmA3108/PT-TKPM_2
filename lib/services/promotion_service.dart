@@ -11,19 +11,25 @@ class PromotionService {
     required Set<String> sellerIds,
   }) async {
     final cleanCode = code.trim().toUpperCase();
-    if (cleanCode.isEmpty || sellerIds.isEmpty) {
+    final cleanSellerIds = sellerIds
+        .map((sellerId) => sellerId.trim())
+        .where((sellerId) => sellerId.isNotEmpty)
+        .toSet();
+    if (cleanCode.isEmpty || cleanSellerIds.isEmpty) {
       return null;
     }
 
     final snapshot = await _firestore
         .collectionGroup('items')
-        .where('code', isEqualTo: cleanCode)
         .get();
 
     for (final doc in snapshot.docs) {
       final sellerId = doc.reference.parent.parent?.id ?? '';
       final data = doc.data();
-      if (!sellerIds.contains(sellerId) || data['isActive'] != true) {
+      final promotionCode = data['code']?.toString().trim().toUpperCase() ?? '';
+      if (promotionCode != cleanCode ||
+          !cleanSellerIds.contains(sellerId) ||
+          data['isActive'] != true) {
         continue;
       }
       return PromotionDiscount.fromMap(data);

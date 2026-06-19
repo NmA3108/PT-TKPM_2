@@ -332,6 +332,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
   String? _selectedClassificationId;
   String _selectedClassificationName = '';
   final _selectedClassifications = <SellerProductTaxonomy>[];
+  final _selectedSizes = <SellerProductTaxonomy>[];
   late final List<String> _existingImageUrls;
   final _imageBytes = <Uint8List>[];
   final _imageNames = <String>[];
@@ -363,6 +364,11 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     for (final name in product?.classifications ?? const <String>[]) {
       _selectedClassifications.add(
         SellerProductTaxonomy(id: name, name: name, type: 'classification'),
+      );
+    }
+    for (final name in product?.sizes ?? const <String>[]) {
+      _selectedSizes.add(
+        SellerProductTaxonomy(id: name, name: name, type: 'size'),
       );
     }
   }
@@ -441,6 +447,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                 selectedCategoryId: _selectedCategoryId,
                 selectedClassificationIds:
                     _selectedClassifications.map((item) => item.id).toSet(),
+                selectedSizeIds: _selectedSizes.map((item) => item.id).toSet(),
                 onCategoryChanged: (item) {
                   setState(() {
                     _selectedCategoryId = item.id;
@@ -464,15 +471,18 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                         : _selectedClassifications.first.name;
                   });
                 },
+                onSizeChanged: (item, selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedSizes.add(item);
+                    } else {
+                      _selectedSizes.removeWhere(
+                        (selectedItem) => selectedItem.id == item.id,
+                      );
+                    }
+                  });
+                },
                 onCreate: _createTaxonomy,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _sizesController,
-                decoration: const InputDecoration(
-                  labelText: 'Kich co tuy chon',
-                  hintText: 'VD: S, M, L. Bo trong neu khong co',
-                ),
               ),
               const SizedBox(height: 18),
               FilledButton(
@@ -535,8 +545,16 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
 
   Future<void> _createTaxonomy(String type) async {
     final controller = TextEditingController();
-    final title = type == 'classification' ? 'Tao phan loai' : 'Tao danh muc';
-    final hint = type == 'classification' ? 'Ten phan loai' : 'Ten danh muc';
+    final title = type == 'classification'
+        ? 'Tạo phân loại'
+        : type == 'size'
+            ? 'Tạo kích cỡ'
+            : 'Tạo danh mục';
+    final hint = type == 'classification'
+        ? 'Tên phân loại'
+        : type == 'size'
+            ? 'Tên kích cỡ'
+            : 'Tên danh mục';
 
     final name = await showDialog<String>(
       context: context,
@@ -553,13 +571,13 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Huy'),
+              child: const Text('Hủy bỏ'),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.of(context).pop(controller.text.trim());
               },
-              child: const Text('Tao'),
+              child: const Text('Tạo'),
             ),
           ],
         );
@@ -581,10 +599,12 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         return;
       }
       setState(() {
-    if (item.isClassification) {
+        if (item.isClassification) {
           _selectedClassifications.add(item);
           _selectedClassificationId = item.id;
           _selectedClassificationName = item.name;
+        } else if (item.isSize) {
+          _selectedSizes.add(item);
         } else {
           _selectedCategoryId = item.id;
           _selectedCategoryName = item.name;
@@ -595,7 +615,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tao that bai: $error')),
+        SnackBar(content: Text('Tạo thất bại: $error')),
       );
     }
   }
@@ -606,7 +626,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     }
     if (_selectedCategoryId == null || _selectedCategoryName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui long chon hoac tao danh muc.')),
+        const SnackBar(content: Text('Vui lòng chọn hoặc tạo danh mục.')),
       );
       return;
     }
@@ -629,7 +649,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         classificationName: _selectedClassificationName.trim(),
         classifications:
             _selectedClassifications.map((item) => item.name).toList(),
-        sizes: _splitOptions(_sizesController.text),
+        sizes: _selectedSizes.map((item) => item.name).toSet().toList(),
         existingImageUrls: _existingImageUrls,
         imageBytes: _imageBytes,
         imageNames: _imageNames,
@@ -677,8 +697,10 @@ class _TaxonomySelector extends StatelessWidget {
     required this.sellerId,
     required this.selectedCategoryId,
     required this.selectedClassificationIds,
+    required this.selectedSizeIds,
     required this.onCategoryChanged,
     required this.onClassificationChanged,
+    required this.onSizeChanged,
     required this.onCreate,
   });
 
@@ -686,9 +708,12 @@ class _TaxonomySelector extends StatelessWidget {
   final String sellerId;
   final String? selectedCategoryId;
   final Set<String> selectedClassificationIds;
+  final Set<String> selectedSizeIds;
   final ValueChanged<SellerProductTaxonomy> onCategoryChanged;
   final void Function(SellerProductTaxonomy item, bool selected)
       onClassificationChanged;
+  final void Function(SellerProductTaxonomy item, bool selected)
+      onSizeChanged;
   final ValueChanged<String> onCreate;
 
   @override
@@ -700,6 +725,7 @@ class _TaxonomySelector extends StatelessWidget {
         final categories = items.where((item) => item.isCategory).toList();
         final classifications =
             items.where((item) => item.isClassification).toList();
+        final sizes = items.where((item) => item.isSize).toList();
         final categoryValue = categories.any((item) {
           return item.id == selectedCategoryId;
         })
@@ -709,12 +735,12 @@ class _TaxonomySelector extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _TaxonomyRow(
-              label: 'Danh muc',
-              buttonLabel: 'Tao danh muc',
+              label: 'Danh mục',
+              buttonLabel: 'Tạo danh mục',
               onCreate: () => onCreate('category'),
               child: DropdownButtonFormField<String>(
                 value: categoryValue,
-                decoration: const InputDecoration(labelText: 'Danh muc'),
+                decoration: const InputDecoration(labelText: 'Danh mục'),
                 items: categories.map((item) {
                   return DropdownMenuItem<String>(
                     value: item.id,
@@ -737,11 +763,11 @@ class _TaxonomySelector extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             _TaxonomyRow(
-              label: 'Phan loai',
-              buttonLabel: 'Tao phan loai',
+              label: 'Phân loại',
+              buttonLabel: 'Tạo phân loại',
               onCreate: () => onCreate('classification'),
               child: classifications.isEmpty
-                  ? const Text('Chua co phan loai.')
+                  ? const Text('Chưa có phân loại.')
                   : Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -752,6 +778,28 @@ class _TaxonomySelector extends StatelessWidget {
                             selected: selectedClassificationIds.contains(item.id),
                             onSelected: (selected) {
                               onClassificationChanged(item, selected);
+                            },
+                          ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 12),
+            _TaxonomyRow(
+              label: 'Kích cỡ',
+              buttonLabel: 'Tạo kích cỡ',
+              onCreate: () => onCreate('size'),
+              child: sizes.isEmpty
+                  ? const Text('Chưa có kích cỡ.')
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final item in sizes)
+                          FilterChip(
+                            label: Text(item.name),
+                            selected: selectedSizeIds.contains(item.id),
+                            onSelected: (selected) {
+                              onSizeChanged(item, selected);
                             },
                           ),
                       ],
@@ -828,7 +876,7 @@ class _ImagePickerBox extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onPick,
           icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(hasImages ? 'Them anh san pham' : context.tr('chooseImage')),
+          label: Text(hasImages ? 'Thêm ảnh sản phẩm' : context.tr('chooseImage')),
         ),
         const SizedBox(height: 10),
         if (!hasImages)

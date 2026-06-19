@@ -6,6 +6,7 @@ import '../../models/checkout_models.dart';
 import '../../services/checkout_service.dart';
 import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/app_asset_icon.dart';
 import '../widgets/product_image.dart';
 import 'order_checkout_screen.dart';
 
@@ -36,12 +37,7 @@ class _CartScreenState extends State<CartScreen> {
       appBar: AppBar(
         backgroundColor: _backgroundColor,
         title: const Text('Giỏ hàng'),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.shopping_bag_outlined),
-          ),
-        ],
+        
       ),
       bottomNavigationBar: const AppBottomNavBar(currentIndex: 2),
       body: userId == null
@@ -184,9 +180,7 @@ class _CartScreenState extends State<CartScreen> {
       final firstItem = entry.value.first;
       final shopName = firstItem.shopName.trim().isNotEmpty
           ? firstItem.shopName.trim()
-          : entry.key == 'default_shop'
-              ? 'Shop'
-              : 'Shop ${entry.key}';
+          : _sellerDisplayName(entry.key);
       return _ShopCartGroupData(shopName: shopName, items: entry.value);
     }).toList();
   }
@@ -202,6 +196,14 @@ class _CartScreenState extends State<CartScreen> {
       return item.sellerId.trim();
     }
     return 'default_shop';
+  }
+
+  String _sellerDisplayName(String sellerId) {
+    if (sellerId == 'default_shop' || sellerId.trim().isEmpty) {
+      return 'Seller000';
+    }
+    final digits = (sellerId.hashCode.abs() % 1000).toString().padLeft(3, '0');
+    return 'Seller$digits';
   }
 
   void _showSnackBar(String message) {
@@ -261,7 +263,7 @@ class _ShopCartGroup extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                const Icon(Icons.storefront_outlined, size: 20),
+                const AppAssetIcon(assetName: 'category_icon.jpg', size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -508,14 +510,14 @@ class _CartSummaryPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SummaryLine(label: 'Tổng tiền', value: subtotal),
+            _SummaryLine(label: 'Tổng giá trị', value: subtotal),
             const Divider(height: 24),
             _SummaryLine(label: 'Phí vận chuyển', value: itemCount == 0 ? 0 : shipping),
             const Divider(height: 24),
             _SummaryLine(
-              label: 'Bag Total',
+              label: 'Tổng tiền',
               value: total,
-              itemCount: itemCount,
+              
               emphasized: true,
             ),
             const SizedBox(height: 20),

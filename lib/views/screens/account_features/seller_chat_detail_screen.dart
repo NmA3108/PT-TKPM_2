@@ -38,12 +38,13 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final userId = user?.uid;
+    final sellerName = _sellerName();
 
     return Scaffold(
       backgroundColor: _backgroundColor,
-      appBar: AppBar(title: Text(widget.sellerName)),
+      appBar: AppBar(title: Text(sellerName)),
       body: userId == null
-          ? const _MessageState(message: 'Vui long dang nhap de nhan tin.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập để nhắn tin.')
           : Column(
               children: [
                 Expanded(
@@ -55,7 +56,7 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return _MessageState(
-                          message: 'Khong the tai tin nhan.\n${snapshot.error}',
+                          message: 'Không thể tải tin nhắn.\n${snapshot.error}',
                         );
                       }
 
@@ -67,7 +68,7 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
                           snapshot.data ?? const <SellerChatMessageModel>[];
                       if (messages.isEmpty) {
                         return const _MessageState(
-                          message: 'Hay bat dau cuoc tro chuyen voi seller.',
+                          message: 'Hãy bắt đầu cuộc trò chuyện.',
                         );
                       }
 
@@ -108,7 +109,7 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
       await _service.sendMessage(
         userId: userId,
         sellerId: widget.sellerId,
-        sellerName: widget.sellerName,
+        sellerName: _sellerName(),
         text: text,
         customerName: customerName,
       );
@@ -118,13 +119,26 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gui tin nhan that bai: $error')),
+        SnackBar(content: Text('Gửi tin nhắn thất bại: $error')),
       );
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
       }
     }
+  }
+
+  String _sellerName() {
+    final name = widget.sellerName.trim();
+    if (name.isNotEmpty &&
+        name != widget.sellerId &&
+        name != 'Seller ${widget.sellerId}' &&
+        name != 'Shop ${widget.sellerId}') {
+      return name;
+    }
+    final digits =
+        (widget.sellerId.hashCode.abs() % 1000).toString().padLeft(3, '0');
+    return 'Seller$digits';
   }
 }
 
@@ -184,7 +198,7 @@ class _InputBar extends StatelessWidget {
                 minLines: 1,
                 maxLines: 4,
                 decoration: const InputDecoration(
-                  hintText: 'Nhap tin nhan...',
+                  hintText: 'Nhập tin nhắn...',
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
