@@ -1,0 +1,59 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Navigation
+
+<PageTitle>Đăng nhập</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <h1 class="h3 mb-3">Đăng nhập Dashboard</h1>
+
+        @if (HasError)
+        {
+            <div class="alert alert-danger">Email hoặc mật khẩu không đúng.</div>
+        }
+
+        @if (HasDatabaseError)
+        {
+            <div class="alert alert-danger">Không kết nối được SQL Server. Hãy kiểm tra <code>DefaultConnection</code> trong <code>appsettings.json</code> và chạy migration/seed trước khi đăng nhập.</div>
+        }
+
+        <form method="post" action="/auth/login" class="border rounded p-4">
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+
+            <div class="mb-3">
+                <label class="form-label" for="email">Email</label>
+                <input class="form-control" id="email" name="email" type="email" value="admin@local.test" autocomplete="username" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="password">Mật khẩu</label>
+                <input class="form-control" id="password" name="password" type="password" value="Admin@123456" autocomplete="current-password" required />
+            </div>
+
+            <button class="btn btn-primary w-100" type="submit">Đăng nhập</button>
+        </form>
+
+        
+    </div>
+</div>
+
+@code {
+    private string ReturnUrl { get; set; } = "/admin";
+    private bool HasError { get; set; }
+    private bool HasDatabaseError { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("returnUrl", out var returnUrl) && returnUrl.ToString().StartsWith('/'))
+        {
+            ReturnUrl = returnUrl.ToString();
+        }
+
+        HasError = query.ContainsKey("error");
+        HasDatabaseError = query.ContainsKey("dbError");
+    }
+}

@@ -1,0 +1,152 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject IReportAnalyticsService Reports
+@inject IJSRuntime JS
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Bảng điều khiển quản trị</h1>
+        <div class="text-muted">Theo dõi GMV, đơn hàng, shop mới và traffic theo thời gian thực.</div>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary" @onclick="ExportExcelAsync">Export Excel</button>
+        <button class="btn btn-outline-secondary" @onclick="ExportPdfAsync">Export PDF</button>
+    </div>
+</div>
+
+<EditForm Model="filterModel" OnValidSubmit="LoadAsync" class="row g-3 align-items-end mb-4">
+    <div class="col-md-2">
+        <label class="form-label">Từ ngày</label>
+        <InputDate class="form-control" @bind-Value="filterModel.From" />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Đến ngày</label>
+        <InputDate class="form-control" @bind-Value="filterModel.To" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Ngành hàng</label>
+        <InputText class="form-control" @bind-Value="filterModel.Category" placeholder="Tất cả" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Khu vực</label>
+        <InputText class="form-control" @bind-Value="filterModel.Region" placeholder="Tất cả" />
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100" disabled="@loading">Lọc</button>
+    </div>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">GMV</div>
+            <div class="fs-4 fw-semibold">@summary.Gmv.ToString("N0") đ</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Đơn hàng</div>
+            <div class="fs-4 fw-semibold">@summary.OrderCount</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Shop mới</div>
+            <div class="fs-4 fw-semibold">@summary.NewStoreCount</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Traffic</div>
+            <div class="fs-4 fw-semibold">@summary.Traffic</div>
+        </div>
+    </div>
+</div>
+
+<div class="border rounded p-3" style="height: 360px">
+    <canvas id="adminKpiChart"></canvas>
+</div>
+
+@code {
+    private readonly FilterModel filterModel = new();
+    private KpiSummary summary = new(0, 0, 0, 0);
+    private List<TimeSeriesPoint> points = [];
+    private bool loading;
+    private string? errorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            loading = true;
+            errorMessage = null;
+            var filter = BuildFilter();
+            summary = await Reports.GetKpiSummaryAsync(filter);
+            points = await Reports.GetTimeSeriesAsync(filter);
+            await RenderChartAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Không thể tải báo cáo: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task RenderChartAsync()
+    {
+        if (points.Count == 0)
+        {
+            points = [new(DateTime.Today.ToString("yyyy-MM-dd"), 0, 0, 0)];
+        }
+
+        await JS.InvokeVoidAsync("dashboardCharts.renderKpiChart", "adminKpiChart",
+            points.Select(x => x.Label).ToArray(),
+            points.Select(x => x.Gmv).ToArray(),
+            points.Select(x => x.Orders).ToArray());
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        var bytes = await Reports.ExportExcelAsync(BuildFilter());
+        await JS.InvokeVoidAsync("dashboardCharts.downloadBytes", "kpi-report.csv", "text/csv", Convert.ToBase64String(bytes));
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        var bytes = await Reports.ExportPdfAsync(BuildFilter());
+        await JS.InvokeVoidAsync("dashboardCharts.downloadBytes", "kpi-report.txt", "text/plain", Convert.ToBase64String(bytes));
+    }
+
+    private AnalyticsFilter BuildFilter()
+        => new(filterModel.From.ToUniversalTime(), filterModel.To.Date.AddDays(1).AddTicks(-1).ToUniversalTime(),
+            string.IsNullOrWhiteSpace(filterModel.Category) ? null : filterModel.Category.Trim(),
+            string.IsNullOrWhiteSpace(filterModel.Region) ? null : filterModel.Region.Trim(),
+            "Day");
+
+    private sealed class FilterModel
+    {
+        public DateTime From { get; set; } = DateTime.Today.AddDays(-30);
+        public DateTime To { get; set; } = DateTime.Today;
+        public string? Category { get; set; }
+        public string? Region { get; set; }
+    }
+}

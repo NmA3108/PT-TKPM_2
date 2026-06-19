@@ -1,0 +1,142 @@
+@page "/staff/live-chat"
+@attribute [Authorize(Roles = "Staff,Admin")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
+@inject ITicketAndChatService TicketService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Live Chat Handover</PageTitle>
+<h1 class="h3 mb-3">Hệ thống Chat hỗ trợ Handover thời gian thực</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="border rounded">
+            <div class="p-3 border-bottom fw-semibold">Queue chờ nhân viên</div>
+            <div class="list-group list-group-flush">
+                @foreach (var session in queue)
+                {
+                    <button class="list-group-item list-group-item-action @(selectedSession?.Id == session.Id ? "active" : "")" @onclick="() => SelectSessionAsync(session.Id)">
+                        <div class="fw-semibold">Khách @session.CustomerId</div>
+                        <div class="small">Confidence AI: @session.BotConfidence.ToString("P0")</div>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="border rounded d-flex flex-column" style="height: 620px">
+            <div class="p-3 border-bottom">
+                <div class="fw-semibold">@(selectedSession is null ? "Chưa chọn phiên chat" : $"Phiên #{selectedSession.Id}")</div>
+                <div class="small text-muted">Nạp lại toàn bộ lịch sử bot trước khi nhân viên tiếp quản.</div>
+            </div>
+            <div class="p-3 flex-grow-1 overflow-auto bg-light">
+                @foreach (var chat in chatMessages)
+                {
+                    <div class="mb-2 text-@(chat.Sender == ChatSender.Staff ? "end" : "start")">
+                        <div class="d-inline-block border rounded px-3 py-2 bg-white text-start" style="max-width:75%">
+                            <div class="small text-muted">@chat.SenderName - @chat.SentAtUtc.ToLocalTime()</div>
+                            <div>@chat.Message</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <EditForm Model="compose" OnValidSubmit="SendAsync" class="p-3 border-top">
+                <DataAnnotationsValidator />
+                <div class="input-group">
+                    <InputText class="form-control" @bind-Value="compose.Text" placeholder="Nhập tin nhắn cho khách hàng" disabled="@(selectedSession is null)" />
+                    <button class="btn btn-primary" disabled="@(selectedSession is null)">Gửi</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<ChatSession> queue = [];
+    private ChatSession? selectedSession;
+    private List<ChatMessage> chatMessages = [];
+    private readonly ComposeModel compose = new();
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQueueAsync();
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/hubs/support-chat"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<long>("HandoverRequested", async _ => await InvokeAsync(LoadQueueAsync));
+        hubConnection.On<ChatMessage>("ReceiveMessage", chat => InvokeAsync(() =>
+        {
+            chatMessages.Add(chat);
+            StateHasChanged();
+        }));
+
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("JoinStaffQueue");
+    }
+
+    private async Task LoadQueueAsync()
+    {
+        queue = await TicketService.GetHandoverQueueAsync();
+        StateHasChanged();
+    }
+
+    private async Task SelectSessionAsync(long sessionId)
+    {
+        try
+        {
+            selectedSession = await TicketService.GetChatSessionAsync(sessionId);
+            chatMessages = selectedSession?.Messages.OrderBy(x => x.SentAtUtc).ToList() ?? [];
+            if (hubConnection is not null)
+            {
+                await hubConnection.InvokeAsync("JoinSession", sessionId);
+            }
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task SendAsync()
+    {
+        if (selectedSession is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var staffName = auth.User.Identity?.Name ?? "Nhân viên CSKH";
+            var sent = await TicketService.SendStaffMessageAsync(selectedSession.Id, staffName, staffName, compose.Text);
+            chatMessages.Add(sent);
+            compose.Text = string.Empty;
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+
+    private sealed class ComposeModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Text { get; set; } = string.Empty;
+    }
+}

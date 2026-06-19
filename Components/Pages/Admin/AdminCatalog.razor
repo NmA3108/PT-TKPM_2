@@ -1,0 +1,166 @@
+@page "/admin/catalog"
+@attribute [Authorize(Roles = "Admin,ProductManager")]
+@rendermode InteractiveServer
+@inject IAdminOperationsService AdminOps
+
+<PageTitle>Danh mục & thương hiệu</PageTitle>
+<h1 class="h3 mb-3">Quản lý danh mục & thương hiệu</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <EditForm Model="categoryModel" OnValidSubmit="SaveCategoryAsync" class="border rounded p-3 mb-3">
+            <DataAnnotationsValidator />
+            <h2 class="h5">Danh mục sản phẩm</h2>
+            <div class="mb-3">
+                <label class="form-label">Tên danh mục</label>
+                <InputText class="form-control" @bind-Value="categoryModel.Name" />
+                <ValidationMessage For="@(() => categoryModel.Name)" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Danh mục cha</label>
+                <InputSelect class="form-select" @bind-Value="categoryModel.ParentId">
+                    <option value="">Không có</option>
+                    @foreach (var category in categories.Where(x => x.Id != categoryModel.Id))
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="form-check form-switch mb-3">
+                <InputCheckbox class="form-check-input" @bind-Value="categoryModel.IsHidden" />
+                <label class="form-check-label">Ẩn danh mục</label>
+            </div>
+            <button class="btn btn-primary">Lưu danh mục</button>
+            <button type="button" class="btn btn-link" @onclick="ResetCategory">Tạo mới</button>
+        </EditForm>
+
+        <div class="list-group">
+            @foreach (var category in categories)
+            {
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-semibold">@category.Name</span>
+                        <span class="small text-muted">@(category.ParentId.HasValue ? $" / Cha #{category.ParentId}" : "")</span>
+                        @if (category.IsHidden)
+                        {
+                            <span class="badge text-bg-secondary ms-2">Ẩn</span>
+                        }
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" @onclick="() => EditCategory(category)">Sửa</button>
+                        <button class="btn btn-outline-danger" @onclick="() => DeleteCategoryAsync(category.Id)">Xóa</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <EditForm Model="brandModel" OnValidSubmit="SaveBrandAsync" class="border rounded p-3 mb-3">
+            <DataAnnotationsValidator />
+            <h2 class="h5">Thương hiệu đối tác</h2>
+            <div class="mb-3">
+                <label class="form-label">Tên thương hiệu</label>
+                <InputText class="form-control" @bind-Value="brandModel.Name" />
+                <ValidationMessage For="@(() => brandModel.Name)" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Logo</label>
+                <InputFile class="form-control" OnChange="OnLogoSelected" accept="image/*" />
+            </div>
+            <div class="form-check form-switch mb-3">
+                <InputCheckbox class="form-check-input" @bind-Value="brandModel.IsHidden" />
+                <label class="form-check-label">Ẩn thương hiệu</label>
+            </div>
+            <button class="btn btn-primary">Lưu thương hiệu</button>
+            <button type="button" class="btn btn-link" @onclick="ResetBrand">Tạo mới</button>
+        </EditForm>
+
+        <div class="row g-3">
+            @foreach (var brand in brands)
+            {
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        @if (!string.IsNullOrWhiteSpace(brand.LogoUrl))
+                        {
+                            <img src="@brand.LogoUrl" alt="@brand.Name" class="img-fluid mb-2" style="max-height:48px" />
+                        }
+                        <div class="fw-semibold">@brand.Name</div>
+                        <div class="small text-muted">@(brand.IsHidden ? "Đang ẩn" : "Đang hiển thị")</div>
+                        <button class="btn btn-sm btn-outline-primary mt-2" @onclick="() => EditBrand(brand)">Sửa</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ProductCategory> categories = [];
+    private List<Brand> brands = [];
+    private ProductCategory categoryModel = new();
+    private Brand brandModel = new();
+    private IBrowserFile? selectedLogo;
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        categories = await AdminOps.GetCategoriesAsync();
+        brands = await AdminOps.GetBrandsAsync();
+    }
+
+    private async Task SaveCategoryAsync()
+    {
+        try
+        {
+            await AdminOps.SaveCategoryAsync(categoryModel);
+            ResetCategory();
+            await ReloadAsync();
+            ShowSuccess("Đã lưu danh mục.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task DeleteCategoryAsync(int id)
+    {
+        try
+        {
+            await AdminOps.DeleteCategoryAsync(id);
+            await ReloadAsync();
+            ShowSuccess("Đã xóa danh mục.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task SaveBrandAsync()
+    {
+        try
+        {
+            await AdminOps.SaveBrandAsync(brandModel, selectedLogo);
+            ResetBrand();
+            await ReloadAsync();
+            ShowSuccess("Đã lưu thương hiệu.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void EditCategory(ProductCategory category)
+        => categoryModel = new ProductCategory { Id = category.Id, Name = category.Name, ParentId = category.ParentId, IsHidden = category.IsHidden };
+
+    private void EditBrand(Brand brand)
+        => brandModel = new Brand { Id = brand.Id, Name = brand.Name, LogoUrl = brand.LogoUrl, IsHidden = brand.IsHidden, IsPartner = brand.IsPartner };
+
+    private void ResetCategory() => categoryModel = new ProductCategory();
+    private void ResetBrand() { brandModel = new Brand(); selectedLogo = null; }
+    private void OnLogoSelected(InputFileChangeEventArgs args) => selectedLogo = args.File;
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}

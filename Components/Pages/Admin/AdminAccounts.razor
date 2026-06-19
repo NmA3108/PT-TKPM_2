@@ -1,0 +1,120 @@
+@page "/admin/accounts"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@inject IAdminOperationsService AdminOps
+@inject UserManager<IdentityUser> UserManager
+
+<PageTitle>Quản lý tài khoản</PageTitle>
+<h1 class="h3 mb-3">Quản lý tài khoản & phân quyền</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="table-responsive border rounded">
+    <table class="table align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>Email</th>
+                <th>Nội dung</th>
+                <th>Sản phẩm</th>
+                <th>Đơn hàng</th>
+                <th>Trạng thái</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@user.Email</div>
+                        <div class="small text-muted">@user.Id</div>
+                    </td>
+                    @foreach (var role in moduleRoles)
+                    {
+                        <td>
+                            <input type="checkbox" class="form-check-input" checked="@RoleMap(user.Id, role)" @onchange="@(async args => await ChangeRoleAsync(user.Id, role, args.Value is true))" />
+                        </td>
+                    }
+                    <td>@(IsLocked(user) ? "Đang khóa" : "Hoạt động")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm @(IsLocked(user) ? "btn-success" : "btn-outline-danger")" @onclick="() => ToggleLockAsync(user)">
+                            @(IsLocked(user) ? "Mở khóa" : "Khóa")
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private readonly string[] moduleRoles = ["ContentManager", "ProductManager", "OrderManager"];
+    private List<IdentityUser> users = [];
+    private readonly Dictionary<string, HashSet<string>> rolesByUser = [];
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        users = await AdminOps.GetStaffUsersAsync();
+        rolesByUser.Clear();
+        foreach (var user in users)
+        {
+            rolesByUser[user.Id] = (await UserManager.GetRolesAsync(user)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private bool RoleMap(string userId, string role) => rolesByUser.TryGetValue(userId, out var roles) && roles.Contains(role);
+
+    private static bool IsLocked(IdentityUser user) => user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow;
+
+    private async Task ChangeRoleAsync(string userId, string role, bool enabled)
+    {
+        try
+        {
+            await AdminOps.SetModuleRoleAsync(userId, role, enabled);
+            if (!rolesByUser.ContainsKey(userId))
+            {
+                rolesByUser[userId] = [];
+            }
+
+            if (enabled)
+            {
+                rolesByUser[userId].Add(role);
+            }
+            else
+            {
+                rolesByUser[userId].Remove(role);
+            }
+
+            ShowSuccess("Đã cập nhật quyền module.");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private async Task ToggleLockAsync(IdentityUser user)
+    {
+        try
+        {
+            await AdminOps.SetAccountLockAsync(user.Id, !IsLocked(user));
+            await ReloadAsync();
+            ShowSuccess("Đã cập nhật trạng thái tài khoản.");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}

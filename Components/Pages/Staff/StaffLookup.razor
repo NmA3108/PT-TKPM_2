@@ -1,0 +1,83 @@
+@page "/staff/lookup"
+@attribute [Authorize(Roles = "Staff,Admin")]
+@rendermode InteractiveServer
+@inject ITicketAndChatService TicketService
+
+<PageTitle>Tra cứu CSKH</PageTitle>
+<h1 class="h3 mb-3">Tra cứu nhanh thông tin</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="border rounded p-3 mb-4">
+    <label class="form-label">Email khách hàng hoặc mã đơn hàng</label>
+    <div class="input-group">
+        <InputText class="form-control" @bind-Value="keyword" placeholder="VD: DH000123 hoặc khach@example.com" />
+        <button class="btn btn-primary" @onclick="SearchAsync">Tra cứu</button>
+    </div>
+</div>
+
+<div class="row g-3">
+    @foreach (var result in results)
+    {
+        <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+                <div class="small text-muted">@result.Kind</div>
+                <div class="h5">@result.Title</div>
+                <div class="mb-3">@result.Subtitle</div>
+                @foreach (var field in result.Fields)
+                {
+                    <div class="d-flex justify-content-between border-top py-2">
+                        <span class="text-muted">@field.Key</span>
+                        <span class="fw-semibold">@field.Value</span>
+                    </div>
+                }
+                @if (result.Kind == "Đơn hàng")
+                {
+                    <div class="mt-3">
+                        <InputText class="form-control form-control-sm mb-2" @bind-Value="shippingAddress" placeholder="Địa chỉ giao hàng mới" />
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-danger" @onclick="() => UpdateOrderAsync(result.Title, OrderStatus.Cancelled)">Hủy khẩn cấp</button>
+                            <button class="btn btn-outline-primary" @onclick="() => UpdateOrderAsync(result.Title, OrderStatus.Confirmed)">Cập nhật giao hàng</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string keyword = string.Empty;
+    private string? shippingAddress;
+    private List<LookupResult> results = [];
+    private string? message;
+    private string messageClass = "alert-success";
+
+    private async Task SearchAsync()
+    {
+        try
+        {
+            results = await TicketService.LookupAsync(keyword);
+            message = results.Count == 0 ? "Không tìm thấy dữ liệu phù hợp." : null;
+            messageClass = "alert-info";
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task UpdateOrderAsync(string orderCode, OrderStatus status)
+    {
+        try
+        {
+            await TicketService.UpdateOrderStatusAsync(orderCode, status, shippingAddress);
+            await SearchAsync();
+            ShowSuccess("Đã cập nhật đơn hàng.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}

@@ -1,0 +1,98 @@
+@page "/admin/stores"
+@attribute [Authorize(Roles = "Admin,ProductManager")]
+@rendermode InteractiveServer
+@inject IAdminOperationsService AdminOps
+
+<PageTitle>Kiểm duyệt gian hàng</PageTitle>
+<h1 class="h3 mb-3">Quản lý gian hàng & kiểm duyệt</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <h2 class="h5">Shop chờ duyệt / vi phạm</h2>
+        <div class="list-group">
+            @foreach (var store in stores)
+            {
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between gap-3">
+                        <div>
+                            <div class="fw-semibold">@store.Name</div>
+                            <div class="small text-muted">@store.OwnerEmail - @store.Status</div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-success" @onclick="() => ModerateStoreAsync(store.Id, ModerationStatus.Approved)">Duyệt</button>
+                            <button class="btn btn-outline-danger" @onclick="() => ModerateStoreAsync(store.Id, ModerationStatus.Rejected)">Từ chối</button>
+                            <button class="btn btn-danger" @onclick="() => ModerateStoreAsync(store.Id, ModerationStatus.Suspended)">Khóa</button>
+                        </div>
+                    </div>
+                    <InputTextArea class="form-control form-control-sm mt-2" @bind-Value="reasonByStore[store.Id]" placeholder="Lý do từ chối / chế tài" />
+                </div>
+            }
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <h2 class="h5">Sản phẩm Seller chờ kiểm duyệt</h2>
+        <div class="list-group">
+            @foreach (var product in pendingProducts)
+            {
+                <div class="list-group-item">
+                    <div class="fw-semibold">@product.ProductName</div>
+                    <div class="small text-muted">Shop: @product.Store?.Name - @product.SubmittedAtUtc.ToLocalTime()</div>
+                    <InputTextArea class="form-control form-control-sm my-2" @bind-Value="reasonByProduct[product.Id]" placeholder="Lý do từ chối sản phẩm" />
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-success" @onclick="() => ModerateProductAsync(product.Id, ModerationStatus.Approved)">Duyệt</button>
+                        <button class="btn btn-outline-danger" @onclick="() => ModerateProductAsync(product.Id, ModerationStatus.Rejected)">Từ chối</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Store> stores = [];
+    private List<ProductModeration> pendingProducts = [];
+    private readonly Dictionary<int, string?> reasonByStore = [];
+    private readonly Dictionary<long, string?> reasonByProduct = [];
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        stores = await AdminOps.GetStoresAsync();
+        pendingProducts = await AdminOps.GetPendingProductsAsync();
+        foreach (var store in stores) reasonByStore.TryAdd(store.Id, store.RejectionReason);
+        foreach (var product in pendingProducts) reasonByProduct.TryAdd(product.Id, product.RejectionReason);
+    }
+
+    private async Task ModerateStoreAsync(int id, ModerationStatus status)
+    {
+        try
+        {
+            await AdminOps.ModerateStoreAsync(id, status, reasonByStore.GetValueOrDefault(id));
+            await ReloadAsync();
+            ShowSuccess("Đã cập nhật gian hàng.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task ModerateProductAsync(long id, ModerationStatus status)
+    {
+        try
+        {
+            await AdminOps.ModerateProductAsync(id, status, reasonByProduct.GetValueOrDefault(id));
+            await ReloadAsync();
+            ShowSuccess("Đã cập nhật kiểm duyệt sản phẩm.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}

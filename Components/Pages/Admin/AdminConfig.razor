@@ -1,0 +1,108 @@
+@page "/admin/config"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject ISystemConfigService ConfigService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Cấu hình hệ thống</PageTitle>
+<h1 class="h3 mb-3">Cấu hình hệ thống tổng sàn</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <EditForm Model="configModel" OnValidSubmit="SaveFeeAsync" class="border rounded p-3">
+            <DataAnnotationsValidator />
+            <h2 class="h5">Phí sàn chiết khấu</h2>
+            <div class="input-group mb-2">
+                <InputNumber class="form-control" @bind-Value="configModel.PlatformFeePercent" />
+                <span class="input-group-text">%</span>
+            </div>
+            <ValidationMessage For="@(() => configModel.PlatformFeePercent)" />
+            <button class="btn btn-primary mt-3">Cập nhật tức thời</button>
+            <div class="small text-muted mt-2">Cache giao dịch mới sẽ được cập nhật ngay sau khi lưu.</div>
+        </EditForm>
+    </div>
+    <div class="col-lg-7">
+        <div class="border rounded p-3">
+            <h2 class="h5">Cổng thanh toán</h2>
+            @foreach (var gateway in gateways)
+            {
+                <div class="d-flex justify-content-between align-items-center border-top py-3">
+                    <div>
+                        <div class="fw-semibold">@gateway.Name</div>
+                        <div class="small text-muted">@gateway.Code</div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <InputCheckbox class="form-check-input" Value="gateway.IsEnabled" ValueChanged="@(async value => await ToggleGatewayAsync(gateway, value))" ValueExpression="@(() => gateway.IsEnabled)" />
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<h2 class="h5 mt-4">Nhật ký cấu hình</h2>
+<div class="table-responsive border rounded">
+    <table class="table table-sm mb-0">
+        <thead class="table-light"><tr><th>Key</th><th>Giá trị cũ</th><th>Giá trị mới</th><th>Người đổi</th><th>Thời điểm</th></tr></thead>
+        <tbody>
+            @foreach (var log in logs)
+            {
+                <tr>
+                    <td>@log.Key</td>
+                    <td>@log.OldValue</td>
+                    <td>@log.NewValue</td>
+                    <td>@log.ChangedBy</td>
+                    <td>@log.ChangedAtUtc.ToLocalTime()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private SystemConfigModel configModel = new();
+    private List<PaymentGatewayConfig> gateways = [];
+    private List<SystemConfigLog> logs = [];
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        configModel = await ConfigService.GetConfigAsync();
+        gateways = await ConfigService.GetPaymentGatewaysAsync();
+        logs = await ConfigService.GetLogsAsync();
+    }
+
+    private async Task SaveFeeAsync()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            await ConfigService.UpdatePlatformFeeAsync(configModel.PlatformFeePercent, auth.User.Identity?.Name);
+            await ReloadAsync();
+            ShowSuccess("Đã cập nhật phí sàn và cache.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task ToggleGatewayAsync(PaymentGatewayConfig gateway, bool enabled)
+    {
+        try
+        {
+            await ConfigService.TogglePaymentGatewayAsync(gateway.Id, enabled);
+            gateway.IsEnabled = enabled;
+            ShowSuccess("Đã cập nhật cổng thanh toán.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}

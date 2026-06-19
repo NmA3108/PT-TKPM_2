@@ -1,0 +1,131 @@
+@page "/admin/cms"
+@attribute [Authorize(Roles = "Admin,ContentManager")]
+@rendermode InteractiveServer
+@inject IContentManagementService Cms
+
+<PageTitle>CMS Banner</PageTitle>
+<h1 class="h3 mb-3">Quản lý CMS Banner quảng cáo</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @messageClass">@message</div>
+}
+
+<EditForm Model="bannerInput" OnValidSubmit="CreateBannerAsync" class="border rounded p-3 mb-4">
+    <DataAnnotationsValidator />
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Tên chiến dịch</label>
+            <InputText class="form-control" @bind-Value="bannerInput.Title" />
+            <ValidationMessage For="@(() => bannerInput.Title)" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">URL điều hướng</label>
+            <InputText class="form-control" @bind-Value="bannerInput.TargetUrl" />
+            <ValidationMessage For="@(() => bannerInput.TargetUrl)" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Ảnh banner</label>
+            <InputFile class="form-control" OnChange="OnBannerSelected" accept="image/png,image/jpeg,image/webp" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Bắt đầu</label>
+            <InputDate class="form-control" @bind-Value="bannerInput.StartAtLocal" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Kết thúc</label>
+            <InputDate class="form-control" @bind-Value="bannerInput.EndAtLocal" />
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check form-switch">
+                <InputCheckbox class="form-check-input" @bind-Value="bannerInput.IsActive" />
+                <label class="form-check-label">Active</label>
+            </div>
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary w-100" disabled="@uploading">Tải lên</button>
+        </div>
+    </div>
+</EditForm>
+
+<div class="row g-3">
+    @foreach (var banner in banners)
+    {
+        <div class="col-lg-4 col-md-6">
+            <div class="border rounded h-100">
+                <img src="@banner.ImageUrl" alt="@banner.Title" class="img-fluid rounded-top" />
+                <div class="p-3">
+                    <div class="fw-semibold">@banner.Title</div>
+                    <a href="@banner.TargetUrl" target="_blank" class="small">@banner.TargetUrl</a>
+                    <div class="small text-muted">@banner.StartAtUtc.ToLocalTime() - @banner.EndAtUtc.ToLocalTime()</div>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" Value="banner.IsActive" ValueChanged="@(async value => await ToggleAsync(banner, value))" ValueExpression="@(() => banner.IsActive)" />
+                            <label class="form-check-label">Hiển thị</label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(banner.Id)">Xóa</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CmsBannerInput bannerInput = new();
+    private IBrowserFile? selectedBanner;
+    private List<CmsBanner> banners = [];
+    private bool uploading;
+    private string? message;
+    private string messageClass = "alert-success";
+
+    protected override async Task OnInitializedAsync() => banners = await Cms.GetBannersAsync();
+
+    private void OnBannerSelected(InputFileChangeEventArgs args) => selectedBanner = args.File;
+
+    private async Task CreateBannerAsync()
+    {
+        if (selectedBanner is null)
+        {
+            ShowError("Vui lòng chọn ảnh banner.");
+            return;
+        }
+
+        try
+        {
+            uploading = true;
+            await Cms.CreateBannerAsync(bannerInput, selectedBanner);
+            bannerInput = new CmsBannerInput();
+            selectedBanner = null;
+            banners = await Cms.GetBannersAsync();
+            ShowSuccess("Đã tạo banner chiến dịch.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+        finally { uploading = false; }
+    }
+
+    private async Task ToggleAsync(CmsBanner banner, bool active)
+    {
+        try
+        {
+            await Cms.ToggleBannerAsync(banner.Id, active);
+            banner.IsActive = active;
+            ShowSuccess("Đã cập nhật trạng thái banner.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        try
+        {
+            await Cms.DeleteBannerAsync(id);
+            banners = await Cms.GetBannersAsync();
+            ShowSuccess("Đã xóa banner.");
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
+    }
+
+    private void ShowSuccess(string text) { messageClass = "alert-success"; message = text; }
+    private void ShowError(string text) { messageClass = "alert-danger"; message = text; }
+}
