@@ -5,6 +5,7 @@ import '../../../controllers/providers/auth_provider.dart';
 import 'seller_messages_screen.dart';
 import 'seller_order_management_screen.dart';
 import 'seller_product_management_screen.dart';
+import 'seller_promotion_management_screen.dart';
 
 const _backgroundColor = Color(0xFFF5F7FB);
 const _surfaceColor = Color(0xFFFFFFFF);
@@ -33,7 +34,7 @@ class SellerDashboardScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          _SellerSummary(userName: user?.fullName ?? 'Người bán'),
+          _SellerSummary(userName: user?.displayName ?? 'Seller000'),
           const SizedBox(height: 18),
           Text(
             'Quản lý cửa hàng',
@@ -73,7 +74,13 @@ class SellerDashboardScreen extends StatelessWidget {
                 title: 'Quản lý khuyến mãi',
                 subtitle: 'Tạo mã giảm giá và chiến dịch bán hàng',
                 icon: Icons.local_offer_outlined,
-                onTap: () => _showComingSoon(context),
+                onTap: user == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const SellerPromotionManagementScreen(),
+                          ),
+                        ),
               ),
               _SellerFeature(
                 title: 'Tương tác với khách hàng',
@@ -148,7 +155,7 @@ class _SellerSummary extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Actor Người bán - quản lý cửa hàng và sản phẩm',
+                  'Quản lý cửa hàng và sản phẩm',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.white70,
                       ),

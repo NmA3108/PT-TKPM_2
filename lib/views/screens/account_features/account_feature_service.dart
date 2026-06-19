@@ -1,46 +1,34 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
-
-import '../../../main.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AccountFeatureService {
-  AccountFeatureService({FirebaseDatabase? database})
-      : _database = database ??
-            FirebaseDatabase.instanceFor(
-              app: Firebase.app(),
-              databaseURL: realtimeDatabaseUrl,
-            );
+  AccountFeatureService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
 
-  DatabaseReference get _ordersRef => _database.ref('orders');
-  DatabaseReference get _sellerApplicationsRef {
-    return _database.ref('sellerApplications');
+  CollectionReference<Map<String, dynamic>> get _ordersRef {
+    return _firestore.collection('orders');
   }
 
-  DatabaseReference get _messagesRef => _database.ref('messages');
+  CollectionReference<Map<String, dynamic>> get _sellerApplicationsRef {
+    return _firestore.collection('sellerApplications');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _messagesRef {
+    return _firestore.collection('messages');
+  }
 
   Stream<List<CustomerOrderModel>> watchCustomerOrders(String userId) {
-    return _ordersRef.orderByChild('customerId').equalTo(userId).onValue.map(
-      (event) {
-        final value = event.snapshot.value;
-        if (value is! Map<dynamic, dynamic>) {
-          return <CustomerOrderModel>[];
-        }
-
-        final orders = <CustomerOrderModel>[];
-        for (final entry in value.entries) {
-          final orderValue = entry.value;
-          if (orderValue is Map<dynamic, dynamic>) {
-            orders.add(
-              CustomerOrderModel.fromMap(entry.key.toString(), orderValue),
-            );
-          }
-        }
-        orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return orders;
-      },
-    );
+    return _ordersRef
+        .where('customerId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+      final orders = snapshot.docs
+          .map((doc) => CustomerOrderModel.fromMap(doc.id, doc.data()))
+          .toList();
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
+    });
   }
 
   Future<void> submitSellerApplication({
@@ -51,83 +39,76 @@ class AccountFeatureService {
     required String address,
     required String description,
   }) async {
-    final applicationRef = _sellerApplicationsRef.push();
-    final applicationId = applicationRef.key;
-    if (applicationId == null) {
-      throw Exception('Khong the tao don dang ky.');
-    }
-
+    final applicationRef = _sellerApplicationsRef.doc();
+    final applicationId = applicationRef.id;
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _database.ref().update({
-      'sellerApplications/$applicationId': {
-        'applicationId': applicationId,
-        'userId': userId,
-        'fullName': fullName.trim(),
-        'phone': phone.trim(),
-        'shopName': shopName.trim(),
-        'address': address.trim(),
-        'description': description.trim(),
+    final batch = _firestore.batch();
+
+    batch.set(applicationRef, {
+      'applicationId': applicationId,
+      'userId': userId,
+      'fullName': fullName.trim(),
+      'phone': phone.trim(),
+      'shopName': shopName.trim(),
+      'address': address.trim(),
+      'description': description.trim(),
+      'status': 'pending',
+      'adminNote': '',
+      'createdAt': now,
+      'updatedAt': now,
+    });
+    batch.set(
+      _firestore
+          .collection('sellerApplicationsByUser')
+          .doc(userId)
+          .collection('applications')
+          .doc(applicationId),
+      {
         'status': 'pending',
-        'adminNote': '',
-        'createdAt': now,
-        'updatedAt': now,
-      },
-      'sellerApplicationsByUser/$userId/$applicationId': {
-        'status': 'pending',
         'shopName': shopName.trim(),
         'createdAt': now,
       },
-      'adminNotifications/sellerApplications/$applicationId': {
+    );
+    batch.set(
+      _firestore
+          .collection('adminNotifications')
+          .doc('sellerApplications')
+          .collection('items')
+          .doc(applicationId),
+      {
         'type': 'seller_application',
         'userId': userId,
         'shopName': shopName.trim(),
         'status': 'unread',
         'createdAt': now,
       },
-    });
+    );
+    await batch.commit();
   }
 
   Stream<List<SellerConversationModel>> watchSellerConversations(
     String userId,
   ) {
-    return _messagesRef.child(userId).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerConversationModel>[];
-      }
-
-      final conversations = <SellerConversationModel>[];
-      for (final entry in value.entries) {
-        final conversationValue = entry.value;
-        if (conversationValue is Map<dynamic, dynamic>) {
-          conversations.add(
-            SellerConversationModel.fromMap(
-              entry.key.toString(),
-              conversationValue,
-            ),
-          );
-        }
-      }
+    return _messagesRef
+        .doc(userId)
+        .collection('conversations')
+        .snapshots()
+        .map((snapshot) {
+      final conversations = snapshot.docs
+          .map((doc) => SellerConversationModel.fromMap(doc.id, doc.data()))
+          .toList();
       conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return conversations;
     });
   }
 
   Stream<List<SellerOrderModel>> watchSellerOrders(String sellerId) {
-    return _ordersRef.onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerOrderModel>[];
-      }
-
+    return _ordersRef.snapshots().map((snapshot) {
       final orders = <SellerOrderModel>[];
-      for (final entry in value.entries) {
-        final orderValue = entry.value;
-        if (orderValue is Map<dynamic, dynamic>) {
-          final order = SellerOrderModel.fromMap(entry.key.toString(), orderValue);
-          if (order.sellerIds.contains(sellerId)) {
-            orders.add(order);
-          }
+      for (final doc in snapshot.docs) {
+        final order = SellerOrderModel.fromMap(doc.id, doc.data());
+        if (order.sellerIds.contains(sellerId)) {
+          orders.add(order);
         }
       }
       orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -137,12 +118,24 @@ class AccountFeatureService {
 
   Future<void> confirmSellerOrder(SellerOrderModel order) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _database.ref().update({
-      'orders/${order.id}/status': 'confirmed',
-      'orders/${order.id}/updatedAt': now,
-      'ordersByCustomer/${order.customerId}/${order.id}/status': 'confirmed',
-      'ordersByCustomer/${order.customerId}/${order.id}/updatedAt': now,
+    final batch = _firestore.batch();
+    batch.update(_ordersRef.doc(order.id), {
+      'status': 'confirmed',
+      'updatedAt': now,
     });
+    batch.set(
+      _firestore
+          .collection('ordersByCustomer')
+          .doc(order.customerId)
+          .collection('orders')
+          .doc(order.id),
+      {
+        'status': 'confirmed',
+        'updatedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
   }
 
   Stream<List<SellerChatMessageModel>> watchMessages({
@@ -150,25 +143,15 @@ class AccountFeatureService {
     required String sellerId,
   }) {
     return _messagesRef
-        .child(userId)
-        .child(sellerId)
-        .child('items')
-        .onValue
-        .map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerChatMessageModel>[];
-      }
-
-      final messages = <SellerChatMessageModel>[];
-      for (final entry in value.entries) {
-        final messageValue = entry.value;
-        if (messageValue is Map<dynamic, dynamic>) {
-          messages.add(
-            SellerChatMessageModel.fromMap(entry.key.toString(), messageValue),
-          );
-        }
-      }
+        .doc(userId)
+        .collection('conversations')
+        .doc(sellerId)
+        .collection('items')
+        .snapshots()
+        .map((snapshot) {
+      final messages = snapshot.docs
+          .map((doc) => SellerChatMessageModel.fromMap(doc.id, doc.data()))
+          .toList();
       messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return messages;
     });
@@ -181,35 +164,47 @@ class AccountFeatureService {
     required String text,
     String customerName = '',
   }) async {
-    final messageRef = _messagesRef.child(userId).child(sellerId).child('items').push();
-    final messageId = messageRef.key;
-    if (messageId == null) {
-      throw Exception('Khong the gui tin nhan.');
-    }
-
+    final messageId = _messagesRef.doc().id;
     final now = DateTime.now().millisecondsSinceEpoch;
-    await _database.ref().update({
-      'messages/$userId/$sellerId/sellerId': sellerId,
-      'messages/$userId/$sellerId/sellerName': sellerName,
-      'messages/$userId/$sellerId/lastMessage': text.trim(),
-      'messages/$userId/$sellerId/updatedAt': now,
-      'messages/$userId/$sellerId/items/$messageId': {
-        'senderId': userId,
-        'senderType': 'customer',
-        'text': text.trim(),
-        'createdAt': now,
-      },
-      'sellerMessages/$sellerId/$userId/customerId': userId,
-      'sellerMessages/$sellerId/$userId/customerName': customerName.trim(),
-      'sellerMessages/$sellerId/$userId/lastMessage': text.trim(),
-      'sellerMessages/$sellerId/$userId/updatedAt': now,
-      'sellerMessages/$sellerId/$userId/items/$messageId': {
-        'senderId': userId,
-        'senderType': 'customer',
-        'text': text.trim(),
-        'createdAt': now,
-      },
-    });
+    final cleanText = text.trim();
+    final customerMessageRef = _messagesRef
+        .doc(userId)
+        .collection('conversations')
+        .doc(sellerId);
+    final sellerMessageRef = _firestore
+        .collection('sellerMessages')
+        .doc(sellerId)
+        .collection('conversations')
+        .doc(userId);
+    final messageData = {
+      'senderId': userId,
+      'senderType': 'customer',
+      'text': cleanText,
+      'createdAt': now,
+    };
+    final batch = _firestore.batch();
+
+    batch.set(customerMessageRef, {
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'lastMessage': cleanText,
+      'updatedAt': now,
+    }, SetOptions(merge: true));
+    batch.set(
+      customerMessageRef.collection('items').doc(messageId),
+      messageData,
+    );
+    batch.set(sellerMessageRef, {
+      'customerId': userId,
+      'customerName': customerName.trim(),
+      'lastMessage': cleanText,
+      'updatedAt': now,
+    }, SetOptions(merge: true));
+    batch.set(
+      sellerMessageRef.collection('items').doc(messageId),
+      messageData,
+    );
+    await batch.commit();
   }
 }
 
@@ -233,7 +228,7 @@ class CustomerOrderModel {
   factory CustomerOrderModel.fromMap(String id, Map<dynamic, dynamic> map) {
     final itemsValue = map['items'];
     var itemCount = 0;
-    var firstProductName = 'Don hang';
+    var firstProductName = 'Đơn hàng';
 
     if (itemsValue is Map<dynamic, dynamic>) {
       itemCount = itemsValue.length;
@@ -321,7 +316,7 @@ class SellerOrderModel {
 
   factory SellerOrderModel.fromMap(String id, Map<dynamic, dynamic> map) {
     final sellerIds = <String>{};
-    var firstProductName = 'Don hang';
+    var firstProductName = 'Đơn hàng';
     final itemsValue = map['items'];
     if (itemsValue is Map<dynamic, dynamic>) {
       for (final value in itemsValue.values) {
@@ -349,16 +344,16 @@ class SellerOrderModel {
   String get statusLabel {
     switch (status) {
       case 'confirmed':
-        return 'Cho lay hang';
+        return 'Chờ lấy hàng';
       case 'shipping':
-        return 'Cho giao hang';
+        return 'Cho giao hàng';
       case 'completed':
-        return 'Da giao';
+        return 'Đã giao';
       case 'cancelled':
-        return 'Da huy';
+        return 'Đã hủy';
       case 'pending':
       default:
-        return 'Cho xac nhan';
+        return 'Cho xác nhận';
     }
   }
 }

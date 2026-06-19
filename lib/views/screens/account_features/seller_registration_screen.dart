@@ -49,9 +49,7 @@ class _SellerRegistrationScreenState extends State<SellerRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
-    final isSeller = user?.role.toLowerCase() == 'seller' ||
-        user?.role.toLowerCase() == 'nguoi ban' ||
-        user?.role.toLowerCase() == 'người bán';
+    final isSeller = user?.isSeller ?? false;
 
     return Scaffold(
       backgroundColor: _backgroundColor,
@@ -299,3 +297,4 @@ class _MessageState extends StatelessWidget {
     );
   }
 }
+

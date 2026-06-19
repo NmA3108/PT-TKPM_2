@@ -42,10 +42,8 @@ class AccountSettingsScreen extends StatelessWidget {
               children: [
                 _AccountSettingsTile(
                   icon: Icons.person_outline,
-                  title: 'Ho so cua toi',
-                  subtitle: user?.fullName.isEmpty ?? true
-                      ? 'Cap nhat ten va email'
-                      : user!.fullName,
+                  title: 'Hồ sơ của tôi',
+                  subtitle: user?.displayName ?? 'Cap nhat ten va Email',
                   onTap: user == null
                       ? null
                       : () => _open(
@@ -55,9 +53,9 @@ class AccountSettingsScreen extends StatelessWidget {
                 ),
                 _AccountSettingsTile(
                   icon: Icons.location_on_outlined,
-                  title: 'Dia chi',
+                  title: 'Địa chỉ',
                   subtitle: user?.deliveryAddress.isEmpty ?? true
-                      ? 'Them dia chi nhan hang'
+                      ? 'Thêm địa chỉ nhận hàng'
                       : user!.deliveryAddress,
                   onTap: user == null
                       ? null
@@ -68,9 +66,9 @@ class AccountSettingsScreen extends StatelessWidget {
                 ),
                 _AccountSettingsTile(
                   icon: Icons.credit_card_outlined,
-                  title: 'Tai khoan thanh toan',
+                  title: 'Tài khoản thanh toán',
                   subtitle: user?.paymentAccount.isEmpty ?? true
-                      ? 'Them thong tin thanh toan'
+                      ? 'Thêm thông tin thanh toán'
                       : user!.paymentAccount,
                   onTap: user == null
                       ? null
@@ -81,8 +79,8 @@ class AccountSettingsScreen extends StatelessWidget {
                 ),
                 _AccountSettingsTile(
                   icon: Icons.lock_outline,
-                  title: 'Doi mat khau',
-                  subtitle: 'Cap nhat mat khau dang nhap',
+                  title: 'Đổi mật khẩu',
+                  subtitle: 'Cập nhật mật khẩu đăng nhập',
                   onTap: user == null
                       ? null
                       : () => _open(context, const _ChangePasswordScreen()),
@@ -94,27 +92,27 @@ class AccountSettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _SettingsSection(
-              title: 'Tien ich khac',
+              title: 'Tiện ích khác',
               children: [
                 _AccountSettingsTile(
                   icon: Icons.storefront_outlined,
-                  title: 'Dang ky ban hang',
-                  subtitle: 'Mo kenh nguoi ban va quan ly san pham',
+                  title: 'Đăng ký bán hàng',
+                  subtitle: 'Mở kênh người bán và quản lý sản phẩm',
                   onTap: user == null
                       ? null
                       : () => _open(context, const SellerRegistrationScreen()),
                 ),
                 _AccountSettingsTile(
                   icon: Icons.favorite_border,
-                  title: 'San pham yeu thich',
-                  subtitle: 'Xem lai danh sach wishlist',
-                  onTap: () => _showMessage(context, 'Chuc nang dang phat trien.'),
+                  title: 'Sản phẩm yêu thích',
+                  subtitle: 'Xem lại danh sách wishlist',
+                  onTap: () => _showMessage(context, 'Chức năng đang phát triển.'),
                 ),
                 _AccountSettingsTile(
                   icon: Icons.local_offer_outlined,
                   title: 'Kho voucher',
-                  subtitle: 'Quan ly voucher va uu dai',
-                  onTap: () => _showMessage(context, 'Chuc nang dang phat trien.'),
+                  subtitle: 'Quản lý voucher và ưu đãi',
+                  onTap: () => _showMessage(context, 'Chức năng đang phát triển.'),
                 ),
               ],
             ),
@@ -123,26 +121,21 @@ class AccountSettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _SettingsSection(
-              title: 'Ho tro',
+              title: 'Hỗ trợ',
               children: [
                 _AccountSettingsTile(
                   icon: Icons.support_agent_outlined,
-                  title: 'Trung tam ho tro',
-                  subtitle: 'Hoi dap va huong dan su dung',
+                  title: 'Trung tâm hỗ trợ',
+                  subtitle: 'Hỏi đáp và hướng dẫn sử dụng',
                   onTap: () => _open(context, const ChatbotScreen()),
                 ),
                 _AccountSettingsTile(
                   icon: Icons.chat_bubble_outline,
-                  title: 'Tin nhan',
-                  subtitle: 'Danh sach seller da tung nhan tin',
+                  title: 'Tin nhắn',
+                  subtitle: 'Danh sách seller đã từng nhận tin',
                   onTap: () => _open(context, const MessagesScreen()),
                 ),
-                _AccountSettingsTile(
-                  icon: Icons.info_outline,
-                  title: 'Ve XeGiaTot',
-                  subtitle: 'Thong tin ung dung va chinh sach',
-                  onTap: () => _showMessage(context, 'XeGiaTot - san xe truc tuyen.'),
-                ),
+
               ],
             ),
           ),
@@ -153,14 +146,14 @@ class AccountSettingsScreen extends StatelessWidget {
               children: [
                 _AccountSettingsTile(
                   icon: Icons.logout,
-                  title: 'Dang xuat',
-                  subtitle: 'Quay lai man hinh dang nhap',
+                  title: 'Đăng xuất',
+                  subtitle: 'Quay lại màn hình đăng nhập',
                   onTap: () => _confirmLogout(context),
                 ),
                 _AccountSettingsTile(
                   icon: Icons.delete_forever_outlined,
-                  title: 'Xoa tai khoan',
-                  subtitle: 'Vo hieu hoa tai khoan nay',
+                  title: 'Xóa tài khoản',
+                  subtitle: 'Vô hiệu hóa tài khoản này',
                   iconColor: _dangerColor,
                   titleColor: _dangerColor,
                   onTap: user == null ? null : () => _confirmDelete(context),
@@ -253,9 +246,7 @@ class _AccountSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = user?.fullName.trim().isNotEmpty == true
-        ? user!.fullName
-        : 'Customer account';
+    final displayName = user?.displayName ?? 'Customer000';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -314,9 +305,7 @@ class _AccountHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = user?.fullName.trim().isNotEmpty == true
-        ? user!.fullName.trim()
-        : user?.mobileNumber ?? 'Khach hang';
+    final name = user?.displayName ?? user?.mobileNumber ?? 'Guest';
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -356,30 +345,12 @@ class _AccountHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'Bac',
-                    style: TextStyle(
-                      color: Color(0xFF4B5563),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
+
           IconButton(
-            tooltip: 'Cai dat',
-            onPressed: () {},
-            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 30),
-          ),
-          IconButton(
-            tooltip: 'Tin nhan',
+            tooltip: 'Tin nhắn',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const ChatbotScreen()),
             ),
@@ -430,7 +401,7 @@ class _PurchaseSection extends StatelessWidget {
                   TextButton.icon(
                     onPressed: onHistoryTap,
                     icon: const Icon(Icons.history),
-                    label: const Text('Xem lich su mua hang'),
+                    label: const Text('Lịch sử mua hàng'),
                   ),
                 ],
               ),
@@ -440,19 +411,19 @@ class _PurchaseSection extends StatelessWidget {
                 children: [
                   _PurchaseAction(
                     icon: Icons.account_balance_wallet_outlined,
-                    label: 'Cho xac nhan',
+                    label: 'Chờ xác nhận',
                   ),
                   _PurchaseAction(
                     icon: Icons.inventory_2_outlined,
-                    label: 'Cho lay hang',
+                    label: 'Chờ lấy hàng',
                   ),
                   _PurchaseAction(
                     icon: Icons.local_shipping_outlined,
-                    label: 'Cho giao hang',
+                    label: 'Đang giao hàng',
                   ),
                   _PurchaseAction(
                     icon: Icons.star_border_rounded,
-                    label: 'Danh gia',
+                    label: 'Đánh giá',
                     badge: '3',
                   ),
                 ],

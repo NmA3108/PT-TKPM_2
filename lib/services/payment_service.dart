@@ -1,69 +1,51 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_account_models.dart';
 
-const realtimeDatabaseUrl =
-    'https://tmdt-e5958-default-rtdb.asia-southeast1.firebasedatabase.app/';
-
 class PaymentService {
-  PaymentService({FirebaseDatabase? database})
-      : _database = database ??
-            FirebaseDatabase.instanceFor(
-              app: Firebase.app(),
-              databaseURL: realtimeDatabaseUrl,
-            );
+  PaymentService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
 
-  DatabaseReference _paymentMethodsRef(String uid) {
-    return _database.ref('users/$uid/payment_methods');
+  CollectionReference<Map<String, dynamic>> _paymentMethodsRef(String uid) {
+    return _firestore.collection('users').doc(uid).collection('payment_methods');
   }
 
   Future<void> ensurePaymentMethodDefaults(String uid) async {
-    final snapshot = await _paymentMethodsRef(uid).get();
-    final value = snapshot.value;
-    final updates = <String, Object?>{};
+    final methodsRef = _paymentMethodsRef(uid);
+    final snapshot = await methodsRef.get();
+    final existingIds = snapshot.docs.map((doc) => doc.id).toSet();
+    final batch = _firestore.batch();
 
-    if (value is! Map<dynamic, dynamic> || value['momo'] is! Map) {
-      updates['momo/linked'] = false;
+    if (!existingIds.contains('momo')) {
+      batch.set(methodsRef.doc('momo'), {'linked': false});
     }
 
-    if (value is! Map<dynamic, dynamic> || value['bank'] is! Map) {
-      updates['bank/linked'] = false;
+    if (!existingIds.contains('bank')) {
+      batch.set(methodsRef.doc('bank'), {'linked': false});
     }
 
-    if (updates.isNotEmpty) {
-      await _paymentMethodsRef(uid).update(updates);
+    if (!existingIds.contains('momo') || !existingIds.contains('bank')) {
+      await batch.commit();
     }
   }
 
   Stream<List<PaymentMethodModel>> watchLinkedMethods(String uid) {
-    return _paymentMethodsRef(uid).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <PaymentMethodModel>[];
-      }
-
+    return _paymentMethodsRef(uid).snapshots().map((snapshot) {
       final methods = <PaymentMethodModel>[];
-      final momo = value['momo'];
-      final bank = value['bank'];
 
-      if (momo is Map<dynamic, dynamic>) {
-        final method = PaymentMethodModel.fromMap(
-          PaymentMethodType.momo,
-          momo,
-        );
-        if (method.linked) {
-          methods.add(method);
+      for (final doc in snapshot.docs) {
+        final type = switch (doc.id) {
+          'momo' => PaymentMethodType.momo,
+          'bank' => PaymentMethodType.bank,
+          _ => null,
+        };
+        if (type == null) {
+          continue;
         }
-      }
 
-      if (bank is Map<dynamic, dynamic>) {
-        final method = PaymentMethodModel.fromMap(
-          PaymentMethodType.bank,
-          bank,
-        );
+        final method = PaymentMethodModel.fromMap(type, doc.data());
         if (method.linked) {
           methods.add(method);
         }
@@ -77,12 +59,13 @@ class PaymentService {
     required String uid,
     required String phoneNumber,
   }) async {
-    await _paymentMethodsRef(uid).child('momo').update(
+    await _paymentMethodsRef(uid).doc('momo').set(
           PaymentMethodModel(
             type: PaymentMethodType.momo,
             linked: true,
             phoneNumber: phoneNumber.trim(),
           ).toMap(),
+          SetOptions(merge: true),
         );
   }
 
@@ -96,13 +79,14 @@ class PaymentService {
         ? normalizedCardNumber
         : normalizedCardNumber.substring(normalizedCardNumber.length - 4);
 
-    await _paymentMethodsRef(uid).child('bank').update(
+    await _paymentMethodsRef(uid).doc('bank').set(
           PaymentMethodModel(
             type: PaymentMethodType.bank,
             linked: true,
             cardLast4: cardLast4,
             expiryDate: expiryDate.trim(),
           ).toMap(),
+          SetOptions(merge: true),
         );
   }
 
@@ -110,17 +94,9 @@ class PaymentService {
     required String uid,
     required PaymentMethodType type,
   }) async {
-    switch (type) {
-      case PaymentMethodType.momo:
-        await _paymentMethodsRef(uid).child('momo').set({
-          'linked': false,
-        });
-        return;
-      case PaymentMethodType.bank:
-        await _paymentMethodsRef(uid).child('bank').set({
-          'linked': false,
-        });
-        return;
-    }
+    await _paymentMethodsRef(uid).doc(type.name).set({
+      'linked': false,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 }

@@ -15,14 +15,17 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _mobileController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _useEmail = false;
 
   @override
   void dispose() {
     _mobileController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -36,7 +39,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     FocusScope.of(context).unfocus();
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.register(
-      mobileNumber: _mobileController.text.trim(),
+      mobileNumber: _useEmail ? '' : _mobileController.text.trim(),
+      email: _useEmail ? _emailController.text.trim() : null,
       password: _passwordController.text,
     );
 
@@ -54,7 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _showError(String? message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message ?? 'Dang ky that bai.')),
+      SnackBar(content: Text(message ?? 'Đăng ký thất bại.')),
     );
   }
 
@@ -78,8 +82,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   _AuthHero(
                     icon: Icons.person_add_alt_1_outlined,
-                    title: 'Tao tai khoan',
-                    subtitle: 'Dang ky bang so dien thoai de mua sam nhanh hon',
+                    title: 'Tạo tài khoản',
+                    subtitle: 'Đăng ký bằng số điện thoại để mua sắm',
                   ),
                   const SizedBox(height: 28),
                   _AuthCard(
@@ -88,15 +92,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment<bool>(
+                                value: false,
+                                icon: Icon(Icons.phone_outlined),
+                                label: Text('So dien thoai'),
+                              ),
+                              ButtonSegment<bool>(
+                                value: true,
+                                icon: Icon(Icons.email_outlined),
+                                label: Text('Email'),
+                              ),
+                            ],
+                            selected: {_useEmail},
+                            onSelectionChanged: isLoading
+                                ? null
+                                : (selection) {
+                                    setState(() {
+                                      _useEmail = selection.first;
+                                    });
+                                  },
+                          ),
+                          const SizedBox(height: 16),
                           TextFormField(
-                            controller: _mobileController,
-                            keyboardType: TextInputType.phone,
+                            controller:
+                                _useEmail ? _emailController : _mobileController,
+                            keyboardType: _useEmail
+                                ? TextInputType.emailAddress
+                                : TextInputType.phone,
                             textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'So dien thoai',
-                              prefixIcon: Icon(Icons.phone_outlined),
+                            decoration: InputDecoration(
+                              labelText:
+                                  _useEmail ? 'Email' : 'Số điện thoại',
+                              prefixIcon: Icon(
+                                _useEmail
+                                    ? Icons.email_outlined
+                                    : Icons.phone_outlined,
+                              ),
                             ),
-                            validator: _validateMobileNumber,
+                            validator: _useEmail
+                                ? _validateEmail
+                                : _validateMobileNumber,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -104,7 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Mat khau',
+                              labelText: 'Mật khẩu',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 onPressed: () {
@@ -127,7 +164,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             obscureText: _obscureConfirmPassword,
                             textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
-                              labelText: 'Xac nhan mat khau',
+                              labelText: 'Xác nhận mật khẩu',
                               prefixIcon: const Icon(Icons.lock_reset_outlined),
                               suffixIcon: IconButton(
                                 onPressed: () {
@@ -149,7 +186,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const SizedBox(height: 24),
                           _LoadingFilledButton(
                             isLoading: isLoading,
-                            label: 'Dang ky',
+                            label: 'Đăng ký',
                             onPressed: _submit,
                           ),
                         ],
@@ -167,21 +204,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String? _validateMobileNumber(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap so dien thoai.';
+      return 'Vui lòng nhập số điện thoại.';
     }
     return null;
   }
 
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) {
+      return 'Vui long nhap email.';
+    }
+    final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!emailPattern.hasMatch(email)) {
+      return 'Email khong hop le.';
+    }
+    return null;
+  }
   String? _validatePassword(String? value) {
     if (value == null || value.length < 6) {
-      return 'Mat khau phai co it nhat 6 ky tu.';
+      return 'Mật khẩu phải có ít nhất 6 ký tự.';
     }
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
     if (value != _passwordController.text) {
-      return 'Mat khau xac nhan khong khop.';
+      return 'Mật khẩu xác nhận không khớp.';
     }
     return _validatePassword(value);
   }
@@ -284,3 +332,5 @@ class _LoadingFilledButton extends StatelessWidget {
     );
   }
 }
+
+

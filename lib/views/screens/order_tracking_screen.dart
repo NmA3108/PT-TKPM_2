@@ -97,7 +97,7 @@ class _OrderInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final id = order?.id ?? 'ORD001245';
-    final total = order == null ? '345.12 USD' : _formatCurrency(order!.grandTotal);
+    final total = order == null ? _formatCurrency(345000) : _formatCurrency(order!.grandTotal);
     final date = order == null ? '17 Jun 2026' : _formatDate(order!.createdAt);
     final product = order?.firstProductName ?? 'Demo product';
     final status = order?.statusLabel ?? 'Cho xac nhan';

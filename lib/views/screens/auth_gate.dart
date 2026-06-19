@@ -14,10 +14,9 @@ class AuthGate extends StatelessWidget {
     final isAuthenticated = context.select<AuthProvider, bool>(
       (provider) => provider.isAuthenticated,
     );
-    final userRole = context.select<AuthProvider, String>(
-      (provider) => provider.currentUser?.role.toLowerCase() ?? '',
+    final isSeller = context.select<AuthProvider, bool>(
+      (provider) => provider.currentUser?.isSeller ?? false,
     );
-    final isSeller = userRole == 'seller' || userRole == 'người bán';
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 240),

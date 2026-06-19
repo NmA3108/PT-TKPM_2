@@ -1,11 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../main.dart';
 import '../models/app_user.dart';
 
 class AuthException implements Exception {
@@ -18,45 +18,123 @@ class AuthException implements Exception {
 }
 
 class AuthService {
-  AuthService({FirebaseDatabase? database})
-    : _database =
-          database ??
-          FirebaseDatabase.instanceFor(
-            app: Firebase.app(),
-            databaseURL: realtimeDatabaseUrl,
-          );
+  AuthService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? firebaseAuth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _firebaseAuth;
 
-  DatabaseReference get _rootRef => _database.ref();
-  DatabaseReference get _usersRef => _rootRef.child('users');
-  DatabaseReference get _usersByPhoneRef => _rootRef.child('usersByPhone');
+  CollectionReference<Map<String, dynamic>> get _usersRef {
+    return _firestore.collection('users');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _usersByPhoneRef {
+    return _firestore.collection('usersByPhone');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _usersByEmailRef {
+    return _firestore.collection('usersByEmail');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _userRolesRef {
+    return _firestore.collection('userRoles');
+  }
+
+  Stream<AppUser?> watchUser(String uid) {
+    late StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>
+        userSubscription;
+    late StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>
+        roleSubscription;
+    Map<String, dynamic>? userData;
+    Map<String, dynamic>? roleData;
+
+    final controller = StreamController<AppUser?>();
+
+    void emitUser() {
+      final data = userData;
+      if (data == null) {
+        return;
+      }
+
+      final mergedData = Map<String, dynamic>.from(data);
+      mergedData['role'] = _effectiveRole(
+        data['role']?.toString(),
+        roleData?['role']?.toString(),
+      );
+      controller.add(AppUser.fromMap(uid, mergedData));
+    }
+
+    controller.onListen = () {
+      userSubscription = _usersRef.doc(uid).snapshots().listen(
+        (snapshot) {
+          userData = snapshot.data();
+          emitUser();
+        },
+        onError: controller.addError,
+      );
+      roleSubscription = _userRolesRef.doc(uid).snapshots().listen(
+        (snapshot) {
+          roleData = snapshot.data();
+          emitUser();
+        },
+        onError: controller.addError,
+      );
+    };
+
+    controller.onCancel = () async {
+      await userSubscription.cancel();
+      await roleSubscription.cancel();
+    };
+
+    return controller.stream;
+  }
 
   Future<AppUser> register({
     required String mobileNumber,
+    String? email,
     required String password,
   }) async {
     final normalizedPhone = _normalizeMobileNumber(mobileNumber);
-    final existingUserSnapshot = await _usersByPhoneRef
-        .child(normalizedPhone)
-        .get();
-
-    if (existingUserSnapshot.exists) {
-      throw const AuthException('So dien thoai da duoc dang ky.');
+    final normalizedEmail = _normalizeEmail(email ?? '');
+    if (normalizedPhone.isEmpty && normalizedEmail.isEmpty) {
+      throw const AuthException('Vui long nhap so dien thoai hoac email.');
     }
 
-    final uid = _usersRef.push().key;
-    if (uid == null) {
-      throw const AuthException('Khong the tao tai khoan luc nay.');
+    if (normalizedPhone.isNotEmpty) {
+      final existingUid = await _findUidByPhone(normalizedPhone);
+      if (existingUid != null) {
+        throw const AuthException('So dien thoai da duoc dang ky.');
+      }
     }
 
+    if (normalizedEmail.isNotEmpty) {
+      final existingUid = await _findUidByEmail(normalizedEmail);
+      if (existingUid != null) {
+        throw const AuthException('Email da duoc dang ky.');
+      }
+    }
+
+    final firebaseUser = normalizedEmail.isEmpty
+        ? null
+        : await _createFirebaseEmailUser(
+            email: normalizedEmail,
+            password: password,
+          );
+    final uid = firebaseUser?.uid ?? _usersRef.doc().id;
     final now = DateTime.now().millisecondsSinceEpoch;
     final salt = _createSalt();
     final passwordHash = _hashPassword(password, salt);
+    final defaultName = 'Customer${_randomDigits()}';
 
     final userData = {
       'uid': uid,
       'mobileNumber': normalizedPhone,
+      'email': normalizedEmail,
+      'fullName': defaultName,
+      'authProvider': normalizedEmail.isEmpty ? 'custom_phone' : 'firebase_email',
       'passwordHash': passwordHash,
       'passwordSalt': salt,
       'role': 'Customer',
@@ -65,11 +143,16 @@ class AuthService {
       'updatedAt': now,
     };
 
-    await _rootRef.update({
-      'users/$uid': userData,
-      'usersByPhone/$normalizedPhone': uid,
-      'userRoles/$uid': 'Customer',
-    });
+    final batch = _firestore.batch();
+    batch.set(_usersRef.doc(uid), userData);
+    if (normalizedPhone.isNotEmpty) {
+      batch.set(_usersByPhoneRef.doc(normalizedPhone), {'uid': uid});
+    }
+    if (normalizedEmail.isNotEmpty) {
+      batch.set(_usersByEmailRef.doc(normalizedEmail), {'uid': uid});
+    }
+    batch.set(_userRolesRef.doc(uid), {'role': 'Customer'});
+    await batch.commit();
 
     return AppUser.fromMap(uid, userData);
   }
@@ -78,18 +161,22 @@ class AuthService {
     required String mobileNumber,
     required String password,
   }) async {
-    final normalizedPhone = _normalizeMobileNumber(mobileNumber);
-    final uidSnapshot = await _usersByPhoneRef.child(normalizedPhone).get();
-
-    if (!uidSnapshot.exists || uidSnapshot.value == null) {
-      throw const AuthException('So dien thoai hoac mat khau khong dung.');
+    final loginIdentifier = mobileNumber.trim();
+    final normalizedEmail = _normalizeEmail(loginIdentifier);
+    final uid = normalizedEmail.contains('@')
+        ? await _signInFirebaseEmailUser(
+            email: normalizedEmail,
+            password: password,
+          )
+        : await _findUidByLoginIdentifier(loginIdentifier);
+    if (uid == null || uid.isEmpty) {
+      throw const AuthException('Tai khoan hoac mat khau khong dung.');
     }
 
-    final uid = uidSnapshot.value.toString();
-    final userSnapshot = await _usersRef.child(uid).get();
-    final userValue = userSnapshot.value;
+    final userSnapshot = await _usersRef.doc(uid).get();
+    final userValue = userSnapshot.data();
 
-    if (userValue is! Map<dynamic, dynamic>) {
+    if (userValue == null) {
       throw const AuthException('Tai khoan khong ton tai.');
     }
 
@@ -102,10 +189,10 @@ class AuthService {
     final inputHash = _hashPassword(password, salt);
 
     if (storedHash != inputHash) {
-      throw const AuthException('So dien thoai hoac mat khau khong dung.');
+      throw const AuthException('Tai khoan hoac mat khau khong dung.');
     }
 
-    return AppUser.fromMap(uid, userValue);
+    return _userFromMapWithRole(uid, userValue);
   }
 
   Future<AppUser> updateAccount({
@@ -115,15 +202,27 @@ class AuthService {
     String? deliveryAddress,
     String? paymentAccount,
   }) async {
+    final currentSnapshot = await _usersRef.doc(uid).get();
+    final currentData = currentSnapshot.data();
+    if (currentData == null) {
+      throw const AuthException('Tai khoan khong ton tai.');
+    }
+
     final updates = <String, Object?>{
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     };
+    var normalizedEmail = '';
 
     if (fullName != null) {
       updates['fullName'] = fullName.trim();
     }
     if (email != null) {
-      updates['email'] = email.trim();
+      normalizedEmail = _normalizeEmail(email);
+      final existingUid = await _findUidByEmail(normalizedEmail);
+      if (existingUid != null && existingUid != uid) {
+        throw const AuthException('Email da duoc dang ky.');
+      }
+      updates['email'] = normalizedEmail;
     }
     if (deliveryAddress != null) {
       updates['deliveryAddress'] = deliveryAddress.trim();
@@ -132,7 +231,18 @@ class AuthService {
       updates['paymentAccount'] = paymentAccount.trim();
     }
 
-    await _usersRef.child(uid).update(updates);
+    final batch = _firestore.batch();
+    batch.update(_usersRef.doc(uid), updates);
+    if (email != null) {
+      final oldEmail = currentData['email']?.toString() ?? '';
+      if (oldEmail.isNotEmpty && oldEmail != normalizedEmail) {
+        batch.delete(_usersByEmailRef.doc(oldEmail));
+      }
+      if (normalizedEmail.isNotEmpty) {
+        batch.set(_usersByEmailRef.doc(normalizedEmail), {'uid': uid});
+      }
+    }
+    await batch.commit();
     return _loadUser(uid);
   }
 
@@ -141,10 +251,10 @@ class AuthService {
     required String currentPassword,
     required String newPassword,
   }) async {
-    final snapshot = await _usersRef.child(uid).get();
-    final value = snapshot.value;
+    final snapshot = await _usersRef.doc(uid).get();
+    final value = snapshot.data();
 
-    if (value is! Map<dynamic, dynamic>) {
+    if (value == null) {
       throw const AuthException('Tai khoan khong ton tai.');
     }
 
@@ -157,49 +267,240 @@ class AuthService {
     }
 
     final newSalt = _createSalt();
-    await _usersRef.child(uid).update({
+    await _usersRef.doc(uid).update({
       'passwordSalt': newSalt,
       'passwordHash': _hashPassword(newPassword, newSalt),
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
+
+    final user = _firebaseAuth.currentUser;
+    if (user != null && user.uid == uid && user.email != null) {
+      await user.updatePassword(newPassword);
+    }
   }
 
   Future<void> deleteAccount(String uid) async {
-    final snapshot = await _usersRef.child(uid).get();
-    final value = snapshot.value;
+    final snapshot = await _usersRef.doc(uid).get();
+    final value = snapshot.data();
 
-    if (value is! Map<dynamic, dynamic>) {
+    if (value == null) {
       throw const AuthException('Tai khoan khong ton tai.');
     }
 
     final phone = value['mobileNumber']?.toString();
-    await _rootRef.update({
-      'users/$uid/status': 'deleted',
-      'users/$uid/updatedAt': DateTime.now().millisecondsSinceEpoch,
-      if (phone != null && phone.isNotEmpty) 'usersByPhone/$phone': null,
-      'userRoles/$uid': null,
+    final email = value['email']?.toString();
+    final batch = _firestore.batch();
+    batch.update(_usersRef.doc(uid), {
+      'status': 'deleted',
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
+    if (phone != null && phone.isNotEmpty) {
+      batch.delete(_usersByPhoneRef.doc(phone));
+    }
+    if (email != null && email.isNotEmpty) {
+      batch.delete(_usersByEmailRef.doc(email));
+    }
+    batch.delete(_userRolesRef.doc(uid));
+    await batch.commit();
   }
 
   Future<AppUser> _loadUser(String uid) async {
-    final snapshot = await _usersRef.child(uid).get();
-    final value = snapshot.value;
+    final snapshot = await _usersRef.doc(uid).get();
+    final value = snapshot.data();
 
-    if (value is! Map<dynamic, dynamic>) {
+    if (value == null) {
       throw const AuthException('Khong the tai thong tin tai khoan.');
     }
 
-    return AppUser.fromMap(uid, value);
+    return _userFromMapWithRole(uid, value);
+  }
+
+  Future<AppUser> _userFromMapWithRole(
+    String uid,
+    Map<dynamic, dynamic> value,
+  ) async {
+    final data = Map<String, dynamic>.from(value);
+    final roleSnapshot = await _userRolesRef.doc(uid).get();
+    data['role'] = _effectiveRole(
+      data['role']?.toString(),
+      roleSnapshot.data()?['role']?.toString(),
+    );
+    return AppUser.fromMap(uid, data);
+  }
+
+  String _effectiveRole(String? userRole, String? indexedRole) {
+    if (_isSellerRole(userRole) || _isSellerRole(indexedRole)) {
+      return 'Seller';
+    }
+    if (userRole != null && userRole.trim().isNotEmpty) {
+      return userRole;
+    }
+    if (indexedRole != null && indexedRole.trim().isNotEmpty) {
+      return indexedRole;
+    }
+    return 'Customer';
+  }
+
+  bool _isSellerRole(String? role) {
+    final normalized = role?.trim().toLowerCase();
+    return normalized == 'seller' ||
+        normalized == 'nguoi ban' ||
+        normalized == 'người bán';
+  }
+
+  Future<String?> _findUidByPhone(String normalizedPhone) async {
+    if (normalizedPhone.isEmpty) {
+      return null;
+    }
+
+    final uidSnapshot = await _usersByPhoneRef.doc(normalizedPhone).get();
+    final uidData = uidSnapshot.data();
+    final uidFromIndex = uidData?['uid']?.toString() ??
+        uidData?['userId']?.toString() ??
+        uidData?['value']?.toString();
+
+    if (uidFromIndex != null && uidFromIndex.isNotEmpty) {
+      return uidFromIndex;
+    }
+
+    final userQuery = await _usersRef
+        .where('mobileNumber', isEqualTo: normalizedPhone)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) {
+      return null;
+    }
+
+    return userQuery.docs.first.id;
+  }
+
+  Future<String?> _findUidByEmail(String normalizedEmail) async {
+    if (normalizedEmail.isEmpty) {
+      return null;
+    }
+
+    final uidSnapshot = await _usersByEmailRef.doc(normalizedEmail).get();
+    final uidData = uidSnapshot.data();
+    final uidFromIndex = uidData?['uid']?.toString() ??
+        uidData?['userId']?.toString() ??
+        uidData?['value']?.toString();
+
+    if (uidFromIndex != null && uidFromIndex.isNotEmpty) {
+      return uidFromIndex;
+    }
+
+    final userQuery = await _usersRef
+        .where('email', isEqualTo: normalizedEmail)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) {
+      return null;
+    }
+
+    return userQuery.docs.first.id;
+  }
+
+  Future<String?> _findUidByLoginIdentifier(String value) async {
+    final normalizedEmail = _normalizeEmail(value);
+    if (normalizedEmail.contains('@')) {
+      return _findUidByEmail(normalizedEmail);
+    }
+
+    final normalizedPhone = _normalizeMobileNumber(value);
+    final uidByPhone = await _findUidByPhone(normalizedPhone);
+    if (uidByPhone != null) {
+      return uidByPhone;
+    }
+
+    if (normalizedEmail.isNotEmpty) {
+      return _findUidByEmail(normalizedEmail);
+    }
+    return null;
   }
 
   String _normalizeMobileNumber(String value) {
     return value.replaceAll(RegExp(r'\D'), '');
   }
 
+  String _normalizeEmail(String value) {
+    return value.trim().toLowerCase();
+  }
+
+  Future<User> _createFirebaseEmailUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = credential.user;
+      if (user == null) {
+        throw const AuthException('Khong the tao tai khoan Firebase Auth.');
+      }
+      return user;
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(_firebaseAuthErrorMessage(error));
+    }
+  }
+
+  Future<String?> _signInFirebaseEmailUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final uid = credential.user?.uid;
+      if (uid != null && uid.isNotEmpty) {
+        return uid;
+      }
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'user-not-found' &&
+          error.code != 'invalid-credential' &&
+          error.code != 'wrong-password') {
+        throw AuthException(_firebaseAuthErrorMessage(error));
+      }
+    }
+
+    return _findUidByEmail(email);
+  }
+
+  String _firebaseAuthErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'email-already-in-use':
+        return 'Email da duoc dang ky.';
+      case 'invalid-email':
+        return 'Email khong hop le.';
+      case 'weak-password':
+        return 'Mat khau qua yeu.';
+      case 'operation-not-allowed':
+        return 'Firebase Authentication chua bat Email/Password.';
+      case 'user-disabled':
+        return 'Tai khoan da bi khoa.';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Tai khoan hoac mat khau khong dung.';
+      default:
+        return error.message ?? 'Firebase Authentication bi loi.';
+    }
+  }
+
   String _createSalt() {
     final random = Random.secure();
     final values = List<int>.generate(16, (_) => random.nextInt(256));
     return base64UrlEncode(values);
+  }
+
+  String _randomDigits() {
+    final random = Random.secure();
+    return (100 + random.nextInt(900)).toString();
   }
 
   String _hashPassword(String password, String salt) {

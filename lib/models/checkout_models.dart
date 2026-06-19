@@ -1,23 +1,27 @@
 class CartItemModel {
   const CartItemModel({
+    required this.cartItemId,
     required this.productId,
     required this.productName,
     required this.thumbnailUrl,
     required this.unitPrice,
     required this.quantity,
     required this.selectedColor,
+    required this.selectedClassification,
     required this.selectedSize,
     required this.sellerId,
     required this.shopId,
     required this.shopName,
   });
 
+  final String cartItemId;
   final String productId;
   final String productName;
   final String thumbnailUrl;
   final double unitPrice;
   final int quantity;
   final String selectedColor;
+  final String selectedClassification;
   final String selectedSize;
   final String sellerId;
   final String shopId;
@@ -27,12 +31,14 @@ class CartItemModel {
 
   factory CartItemModel.fromMap(String productId, Map<dynamic, dynamic> map) {
     return CartItemModel(
-      productId: productId,
+      cartItemId: productId,
+      productId: map['productId'] as String? ?? productId,
       productName: map['productName'] as String? ?? '',
       thumbnailUrl: map['thumbnailUrl'] as String? ?? '',
       unitPrice: _readDouble(map['unitPrice']),
       quantity: _readInt(map['quantity']),
       selectedColor: map['selectedColor'] as String? ?? '',
+      selectedClassification: map['selectedClassification'] as String? ?? '',
       selectedSize: map['selectedSize'] as String? ?? '',
       sellerId: map['sellerId'] as String? ?? '',
       shopId: map['shopId'] as String? ?? '',
@@ -51,6 +57,7 @@ class CartItemModel {
       'unitPrice': unitPrice,
       'quantity': quantity,
       'selectedColor': selectedColor,
+      'selectedClassification': selectedClassification,
       'selectedSize': selectedSize,
       'subtotal': subtotal,
     };

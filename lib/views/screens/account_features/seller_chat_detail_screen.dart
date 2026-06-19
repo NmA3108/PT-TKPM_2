@@ -86,7 +86,7 @@ class _SellerChatDetailScreenState extends State<SellerChatDetailScreen> {
                   isSending: _isSending,
                   onSend: () => _send(
                     userId: userId,
-                    customerName: user?.fullName ?? '',
+                    customerName: user?.displayName ?? 'Customer000',
                   ),
                 ),
               ],

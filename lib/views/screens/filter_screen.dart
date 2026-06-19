@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../utils/currency_formatter.dart';
+
 const _backgroundColor = Color(0xFFF5F7FB);
 const _surfaceColor = Color(0xFFFFFFFF);
 const _primaryTextColor = Color(0xFF111827);
@@ -13,7 +15,7 @@ class FilterScreen extends StatefulWidget {
 }
 
 class _FilterScreenState extends State<FilterScreen> {
-  RangeValues _priceRange = const RangeValues(10, 520);
+  RangeValues _priceRange = const RangeValues(0, 50000000);
   String _selectedCategory = 'Fashion';
   String _selectedSize = 'M';
   String _selectedBrand = 'Nike';
@@ -126,7 +128,7 @@ class _FilterScreenState extends State<FilterScreen> {
 
   void _resetFilters() {
     setState(() {
-      _priceRange = const RangeValues(10, 520);
+      _priceRange = const RangeValues(0, 50000000);
       _selectedCategory = 'Fashion';
       _selectedSize = 'M';
       _selectedBrand = 'Nike';
@@ -173,17 +175,17 @@ class _PriceRangeFilter extends StatelessWidget {
       children: [
         _FilterTitle(
           title: 'Price Range',
-          trailing: '\$${values.start.round()} - \$${values.end.round()}',
+          trailing: '${formatVnd(values.start)} - ${formatVnd(values.end)}',
         ),
         const SizedBox(height: 12),
         RangeSlider(
-          min: 10,
-          max: 520,
-          divisions: 51,
+          min: 0,
+          max: 50000000,
+          divisions: 100,
           values: values,
           labels: RangeLabels(
-            '\$${values.start.round()}',
-            '\$${values.end.round()}',
+            formatVnd(values.start),
+            formatVnd(values.end),
           ),
           onChanged: onChanged,
         ),

@@ -52,7 +52,7 @@ class _SellerCustomerChatScreenState extends State<SellerCustomerChatScreen> {
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai tin nhan.\n${snapshot.error}',
+                    message: 'Không thể tải tin nhắn.\n${snapshot.error}',
                   );
                 }
 
@@ -64,7 +64,7 @@ class _SellerCustomerChatScreenState extends State<SellerCustomerChatScreen> {
                     snapshot.data ?? const <SellerCustomerMessageModel>[];
                 if (messages.isEmpty) {
                   return const _MessageState(
-                    message: 'Chua co tin nhan trong hoi thoai nay.',
+                    message: 'Chưa có tin nhắn trong cuộc trò chuyện này.',
                   );
                 }
 
@@ -108,7 +108,7 @@ class _SellerCustomerChatScreenState extends State<SellerCustomerChatScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gui tin nhan that bai: $error')),
+        SnackBar(content: Text('Gửi tin nhắn thất bại: $error')),
       );
     } finally {
       if (mounted) {
@@ -174,7 +174,7 @@ class _InputBar extends StatelessWidget {
                 minLines: 1,
                 maxLines: 4,
                 decoration: const InputDecoration(
-                  hintText: 'Nhap tin nhan...',
+                  hintText: 'Nhập tin nhắn...',
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,

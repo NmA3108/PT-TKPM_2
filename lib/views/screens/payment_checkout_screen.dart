@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/checkout_models.dart';
 import '../../services/checkout_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../widgets/chatbot_floating_button.dart';
 
 const _backgroundColor = Color(0xFFF5F7FB);
@@ -95,7 +96,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(item.productName),
-                    subtitle: Text('x${item.quantity}'),
+                    subtitle: Text('${_optionText(item)} • x${item.quantity}'),
                     trailing: Text(_formatCurrency(item.subtotal)),
                   ),
                 const Divider(),
@@ -375,6 +376,14 @@ class _SummaryRow extends StatelessWidget {
 }
 
 String _formatCurrency(double value) {
-  final prefix = value < 0 ? '-\$' : '\$';
-  return '$prefix${value.abs().toStringAsFixed(0)}';
+  return formatVnd(value);
+}
+
+String _optionText(CartItemModel item) {
+  final values = [
+    item.selectedClassification,
+    item.selectedColor,
+    item.selectedSize,
+  ].where((value) => value.trim().isNotEmpty).toList();
+  return values.isEmpty ? 'Mac dinh' : values.join(' • ');
 }

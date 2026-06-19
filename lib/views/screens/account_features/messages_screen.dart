@@ -100,7 +100,7 @@ class _ConversationTile extends StatelessWidget {
       ),
       subtitle: Text(
         conversation.lastMessage.isEmpty
-            ? 'Nhan de tiep tuc tro chuyen'
+            ? 'Nhắn để tiếp tục trò chuyện'
             : conversation.lastMessage,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

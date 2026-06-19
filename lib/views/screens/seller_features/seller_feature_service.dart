@@ -1,42 +1,74 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
-
-import '../../../main.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SellerFeatureService {
-  SellerFeatureService({FirebaseDatabase? database})
-      : _database = database ??
-            FirebaseDatabase.instanceFor(
-              app: Firebase.app(),
-              databaseURL: realtimeDatabaseUrl,
-            );
+  SellerFeatureService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
 
-  DatabaseReference get _ordersRef => _database.ref('orders');
-  DatabaseReference get _sellerMessagesRef => _database.ref('sellerMessages');
+  CollectionReference<Map<String, dynamic>> get _ordersRef {
+    return _firestore.collection('orders');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _sellerMessagesRef {
+    return _firestore.collection('sellerMessages');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _usersRef {
+    return _firestore.collection('users');
+  }
+
+  CollectionReference<Map<String, dynamic>> _promotionsRef(String sellerId) {
+    return _firestore.collection('sellerPromotions').doc(sellerId).collection('items');
+  }
+
+  Stream<List<SellerPromotionModel>> watchPromotions(String sellerId) {
+    return _promotionsRef(sellerId).snapshots().map((snapshot) {
+      final promotions = snapshot.docs
+          .map((doc) => SellerPromotionModel.fromMap(doc.id, doc.data()))
+          .toList();
+      promotions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return promotions;
+    });
+  }
+
+  Future<void> createPromotion({
+    required String sellerId,
+    required String code,
+    required String title,
+    required String discountType,
+    required double discountValue,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _promotionsRef(sellerId).doc().set({
+      'code': code.trim().toUpperCase(),
+      'title': title.trim(),
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'isActive': true,
+      'createdAt': now,
+      'updatedAt': now,
+    });
+  }
+
+  Future<void> togglePromotion({
+    required String sellerId,
+    required SellerPromotionModel promotion,
+  }) async {
+    await _promotionsRef(sellerId).doc(promotion.id).update({
+      'isActive': !promotion.isActive,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
 
   Stream<List<SellerOrderModel>> watchSellerOrders(String sellerId) {
-    return _ordersRef.onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerOrderModel>[];
-      }
-
+    return _ordersRef.snapshots().map((snapshot) {
       final orders = <SellerOrderModel>[];
 
-      for (final entry in value.entries) {
-        final orderValue = entry.value;
-
-        if (orderValue is Map<dynamic, dynamic>) {
-          final order = SellerOrderModel.fromMap(
-            entry.key.toString(),
-            orderValue,
-          );
-
-          if (order.sellerIds.contains(sellerId)) {
-            orders.add(order);
-          }
+      for (final doc in snapshot.docs) {
+        final order = SellerOrderModel.fromMap(doc.id, doc.data());
+        if (order.sellerIds.contains(sellerId)) {
+          orders.add(order);
         }
       }
 
@@ -54,37 +86,51 @@ class SellerFeatureService {
     String newStatus,
   ) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+    final batch = _firestore.batch();
 
-    await _database.ref().update({
-      'orders/${order.id}/status': newStatus,
-      'orders/${order.id}/updatedAt': now,
-      'ordersByCustomer/${order.customerId}/${order.id}/status': newStatus,
-      'ordersByCustomer/${order.customerId}/${order.id}/updatedAt': now,
+    batch.update(_ordersRef.doc(order.id), {
+      'status': newStatus,
+      'updatedAt': now,
     });
+    batch.set(
+      _firestore
+          .collection('ordersByCustomer')
+          .doc(order.customerId)
+          .collection('orders')
+          .doc(order.id),
+      {
+        'status': newStatus,
+        'updatedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
   }
 
   Stream<List<SellerCustomerConversationModel>> watchCustomerConversations(
     String sellerId,
   ) {
-    return _sellerMessagesRef.child(sellerId).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerCustomerConversationModel>[];
-      }
-
+    return _sellerMessagesRef
+        .doc(sellerId)
+        .collection('conversations')
+        .snapshots()
+        .asyncMap((snapshot) async {
       final conversations = <SellerCustomerConversationModel>[];
 
-      for (final entry in value.entries) {
-        final conversationValue = entry.value;
-
-        if (conversationValue is Map<dynamic, dynamic>) {
-          conversations.add(
-            SellerCustomerConversationModel.fromMap(
-              entry.key.toString(),
-              conversationValue,
-            ),
-          );
-        }
+      for (final doc in snapshot.docs) {
+        final customerId = doc.id;
+        Map<String, dynamic>? profileData;
+        try {
+          final profile = await _usersRef.doc(customerId).get();
+          profileData = profile.data();
+        } catch (_) {}
+        conversations.add(
+          SellerCustomerConversationModel.fromMap(
+            customerId,
+            doc.data(),
+            displayName: _customerDisplayName(customerId, profileData),
+          ),
+        );
       }
 
       conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -92,35 +138,42 @@ class SellerFeatureService {
     });
   }
 
+  String _customerDisplayName(
+    String customerId,
+    Map<dynamic, dynamic>? profile,
+  ) {
+    final fullName = profile?['fullName']?.toString().trim() ?? '';
+    final generatedName = RegExp(r'^(Customer|Seller)(\d{3})$').firstMatch(
+      fullName,
+    );
+    if (generatedName != null) {
+      return 'Customer${generatedName.group(2)}';
+    }
+    if (fullName.isNotEmpty) {
+      return fullName;
+    }
+
+    var hash = 0;
+    for (final unit in customerId.codeUnits) {
+      hash = (hash * 31 + unit) & 0x7fffffff;
+    }
+    return 'Customer${(hash % 900 + 100)}';
+  }
+
   Stream<List<SellerCustomerMessageModel>> watchCustomerMessages({
     required String sellerId,
     required String customerId,
   }) {
     return _sellerMessagesRef
-        .child(sellerId)
-        .child(customerId)
-        .child('items')
-        .onValue
-        .map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <SellerCustomerMessageModel>[];
-      }
-
-      final messages = <SellerCustomerMessageModel>[];
-
-      for (final entry in value.entries) {
-        final messageValue = entry.value;
-
-        if (messageValue is Map<dynamic, dynamic>) {
-          messages.add(
-            SellerCustomerMessageModel.fromMap(
-              entry.key.toString(),
-              messageValue,
-            ),
-          );
-        }
-      }
+        .doc(sellerId)
+        .collection('conversations')
+        .doc(customerId)
+        .collection('items')
+        .snapshots()
+        .map((snapshot) {
+      final messages = snapshot.docs
+          .map((doc) => SellerCustomerMessageModel.fromMap(doc.id, doc.data()))
+          .toList();
 
       messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       return messages;
@@ -133,41 +186,46 @@ class SellerFeatureService {
     required String sellerName,
     required String text,
   }) async {
-    final messageRef = _sellerMessagesRef
-        .child(sellerId)
-        .child(customerId)
-        .child('items')
-        .push();
-
-    final messageId = messageRef.key;
-    if (messageId == null) {
-      throw Exception('Không thể gửi tin nhắn.');
-    }
-
+    final messageId = _sellerMessagesRef.doc().id;
     final now = DateTime.now().millisecondsSinceEpoch;
     final cleanText = text.trim();
+    final sellerMessageRef = _sellerMessagesRef
+        .doc(sellerId)
+        .collection('conversations')
+        .doc(customerId);
+    final customerMessageRef = _firestore
+        .collection('messages')
+        .doc(customerId)
+        .collection('conversations')
+        .doc(sellerId);
+    final messageData = {
+      'senderId': sellerId,
+      'senderType': 'seller',
+      'text': cleanText,
+      'createdAt': now,
+    };
+    final batch = _firestore.batch();
 
-    await _database.ref().update({
-      'sellerMessages/$sellerId/$customerId/customerId': customerId,
-      'sellerMessages/$sellerId/$customerId/lastMessage': cleanText,
-      'sellerMessages/$sellerId/$customerId/updatedAt': now,
-      'sellerMessages/$sellerId/$customerId/items/$messageId': {
-        'senderId': sellerId,
-        'senderType': 'seller',
-        'text': cleanText,
-        'createdAt': now,
-      },
-      'messages/$customerId/$sellerId/sellerId': sellerId,
-      'messages/$customerId/$sellerId/sellerName': sellerName,
-      'messages/$customerId/$sellerId/lastMessage': cleanText,
-      'messages/$customerId/$sellerId/updatedAt': now,
-      'messages/$customerId/$sellerId/items/$messageId': {
-        'senderId': sellerId,
-        'senderType': 'seller',
-        'text': cleanText,
-        'createdAt': now,
-      },
-    });
+    batch.set(sellerMessageRef, {
+      'customerId': customerId,
+      'lastMessage': cleanText,
+      'updatedAt': now,
+    }, SetOptions(merge: true));
+    batch.set(
+      sellerMessageRef.collection('items').doc(messageId),
+      messageData,
+    );
+    batch.set(customerMessageRef, {
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'lastMessage': cleanText,
+      'updatedAt': now,
+    }, SetOptions(merge: true));
+    batch.set(
+      customerMessageRef.collection('items').doc(messageId),
+      messageData,
+    );
+    await batch.commit();
   }
 }
 
@@ -245,8 +303,47 @@ class SellerOrderModel {
         return 'Đã hủy';
       case 'pending':
       default:
-        return 'Chờ xác nhận';
+        return 'Cho xác nhận';
     }
+  }
+}
+
+class SellerPromotionModel {
+  const SellerPromotionModel({
+    required this.id,
+    required this.code,
+    required this.title,
+    required this.discountType,
+    required this.discountValue,
+    required this.isActive,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String code;
+  final String title;
+  final String discountType;
+  final double discountValue;
+  final bool isActive;
+  final int updatedAt;
+
+  String get discountLabel {
+    if (discountType == 'percent') {
+      return '${discountValue.toStringAsFixed(0)}%';
+    }
+    return '${discountValue.toStringAsFixed(0)} VND';
+  }
+
+  factory SellerPromotionModel.fromMap(String id, Map<dynamic, dynamic> map) {
+    return SellerPromotionModel(
+      id: id,
+      code: map['code']?.toString() ?? '',
+      title: map['title']?.toString() ?? '',
+      discountType: map['discountType']?.toString() ?? 'percent',
+      discountValue: _readDouble(map['discountValue']),
+      isActive: map['isActive'] == true,
+      updatedAt: _readInt(map['updatedAt']),
+    );
   }
 }
 
@@ -266,17 +363,27 @@ class SellerCustomerConversationModel {
   factory SellerCustomerConversationModel.fromMap(
     String customerId,
     Map<dynamic, dynamic> map,
+    {String? displayName}
   ) {
     final customerName = map['customerName']?.toString().trim() ?? '';
 
     return SellerCustomerConversationModel(
       customerId: customerId,
-      customerName:
-          customerName.isEmpty ? 'Khách hàng $customerId' : customerName,
+      customerName: displayName ?? (customerName.isEmpty
+          ? 'Customer${_fallbackDigits(customerId)}'
+          : customerName),
       lastMessage: map['lastMessage']?.toString() ?? '',
       updatedAt: _readInt(map['updatedAt']),
     );
   }
+}
+
+String _fallbackDigits(String value) {
+  var hash = 0;
+  for (final unit in value.codeUnits) {
+    hash = (hash * 31 + unit) & 0x7fffffff;
+  }
+  return (hash % 900 + 100).toString();
 }
 
 class SellerCustomerMessageModel {

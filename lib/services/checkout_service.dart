@@ -1,7 +1,5 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../main.dart';
 import '../models/checkout_models.dart';
 
 class CheckoutException implements Exception {
@@ -14,35 +12,32 @@ class CheckoutException implements Exception {
 }
 
 class CheckoutService {
-  CheckoutService({FirebaseDatabase? database})
-      : _database = database ??
-            FirebaseDatabase.instanceFor(
-              app: Firebase.app(),
-              databaseURL: realtimeDatabaseUrl,
-            );
+  CheckoutService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
 
-  DatabaseReference get _rootRef => _database.ref();
-  DatabaseReference get _productsRef => _database.ref('products');
-  DatabaseReference get _cartsRef => _database.ref('carts');
-  DatabaseReference get _ordersRef => _database.ref('orders');
+  CollectionReference<Map<String, dynamic>> get _productsRef {
+    return _firestore.collection('products');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _cartsRef {
+    return _firestore.collection('carts');
+  }
+
+  CollectionReference<Map<String, dynamic>> get _ordersRef {
+    return _firestore.collection('orders');
+  }
+
+  CollectionReference<Map<String, dynamic>> _cartItemsRef(String userId) {
+    return _cartsRef.doc(userId).collection('items');
+  }
 
   Stream<List<CartItemModel>> watchCartItems(String userId) {
-    return _cartsRef.child(userId).child('items').onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <CartItemModel>[];
-      }
-
-      final items = <CartItemModel>[];
-      for (final entry in value.entries) {
-        final itemValue = entry.value;
-        if (itemValue is Map<dynamic, dynamic>) {
-          items.add(CartItemModel.fromMap(entry.key.toString(), itemValue));
-        }
-      }
-      return items;
+    return _cartItemsRef(userId).snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => CartItemModel.fromMap(doc.id, doc.data()))
+          .toList();
     });
   }
 
@@ -52,24 +47,23 @@ class CheckoutService {
     required int quantity,
   }) async {
     if (quantity <= 0) {
-      await removeCartItem(userId: userId, productId: item.productId);
+      await removeCartItem(userId: userId, productId: item.cartItemId);
       return;
     }
 
     final stock = await _readProductStock(item.productId);
     if (quantity > stock) {
-      throw const CheckoutException('Số lượng yêu cầu vượt quá tồn kho.');
+      throw const CheckoutException('So luong yeu cau vuot qua ton kho.');
     }
 
-    await _cartsRef
-        .child(userId)
-        .child('items')
-        .child(item.productId)
-        .update({
-      'quantity': quantity,
-      'subtotal': item.unitPrice * quantity,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    await _cartItemsRef(userId).doc(item.cartItemId).set(
+      {
+        'quantity': quantity,
+        'subtotal': item.unitPrice * quantity,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      SetOptions(merge: true),
+    );
     await updateCartSummary(userId);
   }
 
@@ -77,31 +71,29 @@ class CheckoutService {
     required String userId,
     required String productId,
   }) async {
-    await _cartsRef.child(userId).child('items').child(productId).remove();
+    await _cartItemsRef(userId).doc(productId).delete();
     await updateCartSummary(userId);
   }
 
   Future<void> updateCartSummary(String userId) async {
-    final snapshot = await _cartsRef.child(userId).child('items').get();
-    final value = snapshot.value;
+    final snapshot = await _cartItemsRef(userId).get();
     var totalItems = 0;
     var totalAmount = 0.0;
 
-    if (value is Map<dynamic, dynamic>) {
-      for (final itemValue in value.values) {
-        if (itemValue is Map<dynamic, dynamic>) {
-          final item = CartItemModel.fromMap('', itemValue);
-          totalItems += item.quantity;
-          totalAmount += item.subtotal;
-        }
-      }
+    for (final doc in snapshot.docs) {
+      final item = CartItemModel.fromMap(doc.id, doc.data());
+      totalItems += item.quantity;
+      totalAmount += item.subtotal;
     }
 
-    await _cartsRef.child(userId).update({
-      'totalItems': totalItems,
-      'totalAmount': totalAmount,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    await _cartsRef.doc(userId).set(
+      {
+        'totalItems': totalItems,
+        'totalAmount': totalAmount,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      SetOptions(merge: true),
+    );
   }
 
   Future<String> createOrderFromCart({
@@ -109,40 +101,51 @@ class CheckoutService {
     required CheckoutDraft draft,
   }) async {
     if (draft.items.isEmpty) {
-      throw const CheckoutException('Giỏ hàng đang trống.');
+      throw const CheckoutException('Gio hang dang trong.');
     }
 
+    final quantitiesByProduct = <String, int>{};
+    final namesByProduct = <String, String>{};
     for (final item in draft.items) {
-      final stock = await _readProductStock(item.productId);
-      if (item.quantity > stock) {
-        throw CheckoutException('${item.productName} không đủ số lượng tồn kho.');
+      quantitiesByProduct[item.productId] =
+          (quantitiesByProduct[item.productId] ?? 0) + item.quantity;
+      namesByProduct[item.productId] = item.productName;
+    }
+
+    final nextStocks = <String, int>{};
+    for (final entry in quantitiesByProduct.entries) {
+      final stock = await _readProductStock(entry.key);
+      if (entry.value > stock) {
+        throw CheckoutException(
+          '${namesByProduct[entry.key] ?? 'San pham'} khong du so luong ton kho.',
+        );
       }
+      nextStocks[entry.key] = stock - entry.value;
     }
 
     if (draft.paymentMethod != 'cod') {
       await Future<void>.delayed(const Duration(seconds: 1));
     }
 
-    final orderRef = _ordersRef.push();
-    final orderId = orderRef.key;
-    if (orderId == null) {
-      throw const CheckoutException('Không thể tạo đơn hàng.');
-    }
-
+    final orderRef = _ordersRef.doc();
+    final orderId = orderRef.id;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final updates = <String, Object?>{};
     final orderItems = <String, Object?>{};
+    final batch = _firestore.batch();
 
     for (final item in draft.items) {
-      orderItems[item.productId] = item.toOrderMap();
-      final stock = await _readProductStock(item.productId);
-      final nextStock = stock - item.quantity;
-      updates['products/${item.productId}/stock'] = nextStock;
-      updates['products/${item.productId}/stock_quantity'] = nextStock;
-      updates['carts/$userId/items/${item.productId}'] = null;
+      orderItems[item.cartItemId] = item.toOrderMap();
+      batch.delete(_cartItemsRef(userId).doc(item.cartItemId));
     }
 
-    updates['orders/$orderId'] = {
+    for (final entry in nextStocks.entries) {
+      batch.update(_productsRef.doc(entry.key), {
+        'stock': entry.value,
+        'stock_quantity': entry.value,
+      });
+    }
+
+    final orderData = {
       'customerId': userId,
       'status': 'pending',
       'paymentStatus': draft.paymentMethod == 'cod' ? 'unpaid' : 'paid',
@@ -162,24 +165,39 @@ class CheckoutService {
       'createdAt': now,
       'updatedAt': now,
     };
-    updates['ordersByCustomer/$userId/$orderId'] = {
-      'status': 'pending',
-      'grandTotal': draft.grandTotal,
-      'createdAt': now,
-    };
-    updates['carts/$userId/totalItems'] = 0;
-    updates['carts/$userId/totalAmount'] = 0;
-    updates['carts/$userId/updatedAt'] = now;
 
-    await _rootRef.update(updates);
+    batch.set(orderRef, orderData);
+    batch.set(
+      _firestore
+          .collection('ordersByCustomer')
+          .doc(userId)
+          .collection('orders')
+          .doc(orderId),
+      {
+        'status': 'pending',
+        'grandTotal': draft.grandTotal,
+        'createdAt': now,
+      },
+    );
+    batch.set(
+      _cartsRef.doc(userId),
+      {
+        'totalItems': 0,
+        'totalAmount': 0,
+        'updatedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+
+    await batch.commit();
     return orderId;
   }
 
   Future<int> _readProductStock(String productId) async {
-    final snapshot = await _productsRef.child(productId).get();
-    final value = snapshot.value;
-    if (value is! Map<dynamic, dynamic> || value['status'] != 'active') {
-      throw const CheckoutException('Sản phẩm không còn tồn tại.');
+    final snapshot = await _productsRef.doc(productId).get();
+    final value = snapshot.data();
+    if (value == null || value['status'] != 'active') {
+      throw const CheckoutException('San pham khong con ton tai.');
     }
 
     final stockValue = value['stock_quantity'] ?? value['stock'];

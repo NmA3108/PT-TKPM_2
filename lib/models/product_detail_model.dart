@@ -13,8 +13,10 @@ class ProductDetailModel {
     required this.sellerId,
     required this.shopId,
     required this.shopName,
+    required this.shopAvatarUrl,
     required this.status,
     required this.colors,
+    required this.classifications,
     required this.sizes,
   });
 
@@ -31,8 +33,10 @@ class ProductDetailModel {
   final String sellerId;
   final String shopId;
   final String shopName;
+  final String shopAvatarUrl;
   final String status;
   final List<String> colors;
+  final List<String> classifications;
   final List<String> sizes;
 
   bool get isAvailable {
@@ -50,7 +54,7 @@ class ProductDetailModel {
       name: _readString(map, ['name', 'productName', 'title']),
       description: _readString(map, ['description', 'detail', 'desc']),
       price: _readDouble(map, ['salePrice', 'discountPrice', 'price']),
-      ratingAverage: _readDouble(map, ['ratingAverage', 'rating', 'stars']),
+      ratingAverage: _safeRating(_readDouble(map, ['ratingAverage', 'rating', 'stars'])),
       stockQuantity: _readInt(map, ['stock_quantity', 'stock', 'quantity']),
       imageUrl: images.isEmpty ? '' : images.first,
       imageUrls: images,
@@ -59,8 +63,10 @@ class ProductDetailModel {
       sellerId: _readString(map, ['sellerId']),
       shopId: _readString(map, ['shopId']),
       shopName: _readString(map, ['shopName', 'storeName', 'sellerName']),
+      shopAvatarUrl: _readString(map, ['shopAvatarUrl', 'sellerAvatarUrl']),
       status: _readString(map, ['status'], fallback: 'active'),
       colors: _readStringList(map, ['colors', 'colorOptions']),
+      classifications: _readClassifications(map),
       sizes: _readStringList(map, ['sizes', 'sizeOptions']),
     );
   }
@@ -68,11 +74,13 @@ class ProductDetailModel {
   Map<String, Object?> toCartItemMap({
     required int quantity,
     required String selectedColor,
+    required String selectedClassification,
     required String selectedSize,
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     return {
+      'productId': id,
       'sellerId': sellerId,
       'shopId': shopId,
       'shopName': shopName,
@@ -81,6 +89,7 @@ class ProductDetailModel {
       'unitPrice': price,
       'quantity': quantity,
       'selectedColor': selectedColor,
+      'selectedClassification': selectedClassification,
       'selectedSize': selectedSize,
       'subtotal': price * quantity,
       'updatedAt': now,
@@ -105,13 +114,22 @@ class ProductDetailModel {
     for (final key in keys) {
       final value = map[key];
       if (value is num) {
-        return value.toDouble();
+        final number = value.toDouble();
+        return number.isFinite ? number : 0;
       }
       if (value is String) {
-        return double.tryParse(value) ?? 0;
+        final number = double.tryParse(value) ?? 0;
+        return number.isFinite ? number : 0;
       }
     }
     return 0;
+  }
+
+  static double _safeRating(double value) {
+    if (value.isNaN || value.isInfinite || value < 0) {
+      return 0;
+    }
+    return value > 5 ? 5 : value;
   }
 
   static int _readInt(Map<dynamic, dynamic> map, List<String> keys) {
@@ -140,14 +158,14 @@ class ProductDetailModel {
     final imageUrls = map['imageUrls'];
     if (imageUrls is Map) {
       images.addAll(
-        imageUrls.values.map((value) => value.toString()).where(
+        imageUrls.values.map(_stringFromOption).where(
               (value) => value.trim().isNotEmpty,
             ),
       );
     }
     if (imageUrls is List) {
       images.addAll(
-        imageUrls.map((value) => value.toString()).where(
+        imageUrls.map(_stringFromOption).where(
               (value) => value.trim().isNotEmpty,
             ),
       );
@@ -164,17 +182,39 @@ class ProductDetailModel {
       final value = map[key];
       if (value is List) {
         return value
-            .map((item) => item.toString())
+            .map(_stringFromOption)
             .where((item) => item.trim().isNotEmpty)
             .toList();
       }
       if (value is Map) {
         return value.values
-            .map((item) => item.toString())
+            .map(_stringFromOption)
             .where((item) => item.trim().isNotEmpty)
             .toList();
       }
     }
     return const [];
+  }
+
+  static List<String> _readClassifications(Map<dynamic, dynamic> map) {
+    final values = _readStringList(map, ['classifications', 'variants']);
+    if (values.isNotEmpty) {
+      return values;
+    }
+
+    final classificationName = _readString(map, ['classificationName']);
+    return classificationName.isEmpty ? const [] : [classificationName];
+  }
+
+  static String _stringFromOption(Object? value) {
+    if (value is Map) {
+      for (final key in const ['name', 'label', 'title', 'url', 'imageUrl']) {
+        final item = value[key];
+        if (item != null && item.toString().trim().isNotEmpty) {
+          return item.toString().trim();
+        }
+      }
+    }
+    return value?.toString().trim() ?? '';
   }
 }

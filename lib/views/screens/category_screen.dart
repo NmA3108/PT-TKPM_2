@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/product_model.dart';
 import '../../services/product_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/chatbot_floating_button.dart';
 import '../widgets/product_image.dart';
@@ -208,5 +209,5 @@ class _MessagePanel extends StatelessWidget {
 }
 
 String _formatCurrency(double value) {
-  return '${value.toStringAsFixed(value >= 100 ? 0 : 2)} d';
+  return formatVnd(value);
 }

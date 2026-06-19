@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../controllers/providers/auth_provider.dart';
 import '../../models/checkout_models.dart';
 import '../../services/checkout_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/product_image.dart';
 import 'order_checkout_screen.dart';
@@ -34,7 +35,7 @@ class _CartScreenState extends State<CartScreen> {
       backgroundColor: _backgroundColor,
       appBar: AppBar(
         backgroundColor: _backgroundColor,
-        title: const Text('Shopping Bag'),
+        title: const Text('Giỏ hàng'),
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 16),
@@ -44,13 +45,13 @@ class _CartScreenState extends State<CartScreen> {
       ),
       bottomNavigationBar: const AppBottomNavBar(currentIndex: 2),
       body: userId == null
-          ? const _MessageState(message: 'Vui long dang nhap de xem gio hang.')
+          ? const _MessageState(message: 'Vui lòng đăng nhập để xem giỏ hàng.')
           : StreamBuilder<List<CartItemModel>>(
               stream: _service.watchCartItems(userId),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return _MessageState(
-                    message: 'Khong the tai gio hang.\n${snapshot.error}',
+                    message: 'Không thể tải giỏ hàng.\n${snapshot.error}',
                   );
                 }
 
@@ -60,12 +61,12 @@ class _CartScreenState extends State<CartScreen> {
 
                 final items = snapshot.data ?? <CartItemModel>[];
                 if (items.isEmpty) {
-                  return const _MessageState(message: 'Gio hang dang trong.');
+                  return const _MessageState(message: 'Giỏ hàng đang trống.');
                 }
 
                 _syncSelectedItems(items);
                 final selectedItems = items
-                    .where((item) => _selectedProductIds.contains(item.productId))
+                    .where((item) => _selectedProductIds.contains(item.cartItemId))
                     .toList();
                 final groups = _groupItemsByShop(items);
                 final subtotal = selectedItems.fold<double>(
@@ -135,22 +136,22 @@ class _CartScreenState extends State<CartScreen> {
         quantity: quantity,
       );
     } catch (error) {
-      _showSnackBar('Cap nhat gio hang that bai: $error');
+      _showSnackBar('Cập nhật giỏ hàng thất bại: $error');
     }
   }
 
   Future<void> _removeItem(String userId, CartItemModel item) async {
     try {
-      await _service.removeCartItem(userId: userId, productId: item.productId);
-      _selectedProductIds.remove(item.productId);
-      _showSnackBar('Da xoa san pham khoi gio hang.');
+      await _service.removeCartItem(userId: userId, productId: item.cartItemId);
+      _selectedProductIds.remove(item.cartItemId);
+      _showSnackBar('Đã xóa sản phẩm khỏi giỏ hàng.');
     } catch (error) {
-      _showSnackBar('Xoa san pham that bai: $error');
+      _showSnackBar('Xóa sản phẩm thất bại: $error');
     }
   }
 
   void _syncSelectedItems(List<CartItemModel> items) {
-    final currentIds = items.map((item) => item.productId).toSet();
+    final currentIds = items.map((item) => item.cartItemId).toSet();
     if (!_didInitializeSelection) {
       _selectedProductIds
         ..clear()
@@ -165,9 +166,9 @@ class _CartScreenState extends State<CartScreen> {
   void _toggleItemSelection(CartItemModel item, bool selected) {
     setState(() {
       if (selected) {
-        _selectedProductIds.add(item.productId);
+        _selectedProductIds.add(item.cartItemId);
       } else {
-        _selectedProductIds.remove(item.productId);
+        _selectedProductIds.remove(item.cartItemId);
       }
     });
   }
@@ -365,7 +366,7 @@ class _CartItemCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${item.selectedColor} - ${item.selectedSize}',
+                  _optionText(item),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -404,6 +405,15 @@ class _CartItemCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _optionText(CartItemModel item) {
+  final values = [
+    item.selectedClassification,
+    item.selectedColor,
+    item.selectedSize,
+  ].where((value) => value.trim().isNotEmpty).toList();
+  return values.isEmpty ? 'Mac dinh' : values.join(' - ');
 }
 
 class _QuantityStepper extends StatelessWidget {
@@ -484,7 +494,7 @@ class _CartSummaryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const shipping = 2.0;
+    const shipping = 30000.0;
     final total = itemCount == 0 ? 0.0 : subtotal + shipping;
 
     return SafeArea(
@@ -498,9 +508,9 @@ class _CartSummaryPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SummaryLine(label: 'Subtotal', value: subtotal),
+            _SummaryLine(label: 'Tổng tiền', value: subtotal),
             const Divider(height: 24),
-            _SummaryLine(label: 'Shipping', value: itemCount == 0 ? 0 : shipping),
+            _SummaryLine(label: 'Phí vận chuyển', value: itemCount == 0 ? 0 : shipping),
             const Divider(height: 24),
             _SummaryLine(
               label: 'Bag Total',
@@ -521,7 +531,7 @@ class _CartSummaryPanel extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Proceed To Checkout'),
+                child: const Text('Thanh toán'),
               ),
             ),
           ],
@@ -593,5 +603,5 @@ class _MessageState extends StatelessWidget {
 }
 
 String _formatCurrency(double value) {
-  return '${value.toStringAsFixed(value >= 100 ? 0 : 2)} d';
+  return formatVnd(value);
 }

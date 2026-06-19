@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -25,17 +22,12 @@ class ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final source = imageUrl.trim();
-    if (source.startsWith('data:image')) {
-      return _MemoryDataImage(
-        dataUrl: source,
-        fit: fit,
-        width: width,
-        height: height,
-        errorWidget: errorWidget,
-      );
-    }
+    final uri = Uri.tryParse(source);
+    final isNetworkImage = uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
 
-    if (source.isEmpty) {
+    if (source.isEmpty || source.startsWith('data:image') || !isNetworkImage) {
       return errorWidget ?? const Icon(Icons.image_not_supported_outlined);
     }
 
@@ -49,44 +41,5 @@ class ProductImage extends StatelessWidget {
         return errorWidget ?? const Icon(Icons.image_not_supported_outlined);
       },
     );
-  }
-}
-
-class _MemoryDataImage extends StatelessWidget {
-  const _MemoryDataImage({
-    required this.dataUrl,
-    required this.fit,
-    required this.width,
-    required this.height,
-    required this.errorWidget,
-  });
-
-  final String dataUrl;
-  final BoxFit fit;
-  final double? width;
-  final double? height;
-  final Widget? errorWidget;
-
-  @override
-  Widget build(BuildContext context) {
-    try {
-      final commaIndex = dataUrl.indexOf(',');
-      if (commaIndex == -1) {
-        return errorWidget ?? const Icon(Icons.image_not_supported_outlined);
-      }
-
-      final bytes = base64Decode(dataUrl.substring(commaIndex + 1));
-      return Image.memory(
-        Uint8List.fromList(bytes),
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (_, __, ___) {
-          return errorWidget ?? const Icon(Icons.image_not_supported_outlined);
-        },
-      );
-    } catch (_) {
-      return errorWidget ?? const Icon(Icons.image_not_supported_outlined);
-    }
   }
 }

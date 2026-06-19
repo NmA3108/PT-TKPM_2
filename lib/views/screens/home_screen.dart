@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../controllers/providers/auth_provider.dart';
 import '../../models/product_model.dart';
 import '../../services/product_service.dart';
+import '../../utils/currency_formatter.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/chatbot_floating_button.dart';
 import '../widgets/product_image.dart';
-import 'filter_screen.dart';
 import 'product_detail_screen.dart';
 
 const _backgroundColor = Color(0xFFF8F7FC);
@@ -14,10 +16,30 @@ const _primaryTextColor = Color(0xFF0B1B2E);
 const _secondaryTextColor = Color(0xFF8A8F9C);
 const _accentColor = Color(0xFF5D3FD3);
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static final ProductService _productService = ProductService();
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  String _draftKeyword = '';
+  String _submittedKeyword = '';
+  String _sortMode = 'relevance';
+  double? _minPrice;
+  double? _maxPrice;
+  var _showSuggestions = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +55,26 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               sliver: SliverToBoxAdapter(
                 child: _HomeHeader(
-                  onFilterTap: () => _open(context, const FilterScreen()),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  showSuggestions: _showSuggestions,
+                  keyword: _draftKeyword,
+                  hasSearched: _submittedKeyword.isNotEmpty,
+                  sortMode: _sortMode,
+                  hasPriceFilter: _minPrice != null || _maxPrice != null,
+                  onChanged: (value) {
+                    setState(() => _draftKeyword = value.trim());
+                  },
+                  onSubmitted: _submitSearch,
+                  onFocusChanged: (focused) {
+                    setState(() => _showSuggestions = focused);
+                  },
+                  onSuggestionSelected: _selectSuggestion,
+                  onFilterTap: _openPriceFilter,
+                  onSortChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _sortMode = value);
+                  },
                 ),
               ),
             ),
@@ -45,7 +86,9 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 26, 0, 0),
               sliver: SliverToBoxAdapter(
                 child: StreamBuilder<List<ProductModel>>(
-                  stream: _productService.watchProducts(),
+                  stream: _submittedKeyword.isEmpty
+                      ? _productService.watchProducts()
+                      : _productService.searchProducts(_submittedKeyword),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const SizedBox(
@@ -60,7 +103,9 @@ class HomeScreen extends StatelessWidget {
                       );
                     }
 
-                    final products = snapshot.data ?? <ProductModel>[];
+                    final products = _applySearchTools(
+                      snapshot.data ?? <ProductModel>[],
+                    );
                     if (products.isEmpty) {
                       return const _MessagePanel(message: 'Chưa có sản phẩm.');
                     }
@@ -70,15 +115,22 @@ class HomeScreen extends StatelessWidget {
 
                     return Column(
                       children: [
-                        _HorizontalProductSection(
-                          title: 'Moi nhat',
-                          products: products.take(8).toList(),
-                        ),
-                        const SizedBox(height: 28),
-                        _HorizontalProductSection(
-                          title: 'Noi bat',
-                          products: popularProducts.take(8).toList(),
-                        ),
+                        if (_submittedKeyword.isNotEmpty)
+                          _HorizontalProductSection(
+                            title: 'Ket qua tim kiem',
+                            products: products.take(12).toList(),
+                          )
+                        else ...[
+                          _HorizontalProductSection(
+                            title: 'Moi nhat',
+                            products: products.take(8).toList(),
+                          ),
+                          const SizedBox(height: 28),
+                          _HorizontalProductSection(
+                            title: 'Noi bat',
+                            products: popularProducts.take(8).toList(),
+                          ),
+                        ],
                         const SizedBox(height: 92),
                       ],
                     );
@@ -92,45 +144,318 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _open(BuildContext context, Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  Future<void> _submitSearch(String value) async {
+    final keyword = value.trim();
+    setState(() {
+      _draftKeyword = keyword;
+      _submittedKeyword = keyword;
+      _showSuggestions = false;
+    });
+    _searchFocusNode.unfocus();
+
+    String? userId;
+    try {
+      userId = context.read<AuthProvider>().currentUser?.uid;
+    } catch (_) {}
+    if (userId != null && keyword.isNotEmpty) {
+      try {
+        await _productService.saveSearchKeyword(
+          userId: userId,
+          keyword: keyword,
+        );
+      } catch (_) {}
+    }
+  }
+
+  void _selectSuggestion(String keyword) {
+    _searchController.text = keyword;
+    _submitSearch(keyword);
+  }
+
+  List<ProductModel> _applySearchTools(List<ProductModel> products) {
+    var result = products.where((product) {
+      final price = product.displayPrice;
+      final aboveMin = _minPrice == null || price >= _minPrice!;
+      final belowMax = _maxPrice == null || price <= _maxPrice!;
+      return aboveMin && belowMax;
+    }).toList();
+
+    switch (_sortMode) {
+      case 'priceAsc':
+        result.sort((a, b) => a.displayPrice.compareTo(b.displayPrice));
+        break;
+      case 'priceDesc':
+        result.sort((a, b) => b.displayPrice.compareTo(a.displayPrice));
+        break;
+      case 'rating':
+        result.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      default:
+        break;
+    }
+    return result;
+  }
+
+  Future<void> _openPriceFilter() async {
+    final result = await showModalBottomSheet<_PriceFilterResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _PriceFilterSheet(
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+      ),
+    );
+    if (result == null) {
+      return;
+    }
+    setState(() {
+      _minPrice = result.minPrice;
+      _maxPrice = result.maxPrice;
+    });
   }
 }
 
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
+    required this.controller,
+    required this.focusNode,
+    required this.showSuggestions,
+    required this.keyword,
+    required this.hasSearched,
+    required this.sortMode,
+    required this.hasPriceFilter,
+    required this.onChanged,
+    required this.onSubmitted,
+    required this.onFocusChanged,
+    required this.onSuggestionSelected,
     required this.onFilterTap,
+    required this.onSortChanged,
   });
 
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool showSuggestions;
+  final String keyword;
+  final bool hasSearched;
+  final String sortMode;
+  final bool hasPriceFilter;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onSubmitted;
+  final ValueChanged<bool> onFocusChanged;
+  final ValueChanged<String> onSuggestionSelected;
   final VoidCallback onFilterTap;
+  final ValueChanged<String?> onSortChanged;
 
   @override
   Widget build(BuildContext context) {
+    String? userId;
+    try {
+      userId = context.watch<AuthProvider>().currentUser?.uid;
+    } catch (_) {}
+
     return Column(
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Tim xe, phu kien, hang xe...',
-                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Tim kiem...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: keyword.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            controller.clear();
+                            onChanged('');
+                            onSubmitted('');
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            SizedBox.square(
-              dimension: 52,
-              child: IconButton.filled(
-                onPressed: onFilterTap,
-                icon: const Icon(Icons.tune_rounded),
+                onChanged: onChanged,
+                onSubmitted: onSubmitted,
+                onTap: () => onFocusChanged(true),
               ),
             ),
           ],
         ),
+        if (hasSearched) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              FilterChip(
+                selected: hasPriceFilter,
+                onSelected: (_) => onFilterTap(),
+                avatar: const Icon(Icons.tune_rounded, size: 18),
+                label: const Text('Loc gia'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: sortMode,
+                  decoration: const InputDecoration(
+                    labelText: 'Sap xep',
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'relevance',
+                      child: Text('Lien quan'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'priceAsc',
+                      child: Text('Gia tang dan'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'priceDesc',
+                      child: Text('Gia giam dan'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'rating',
+                      child: Text('Danh gia cao'),
+                    ),
+                  ],
+                  onChanged: onSortChanged,
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (showSuggestions && userId != null)
+          StreamBuilder<List<String>>(
+            stream: _HomeScreenState._productService.watchSearchHistory(userId),
+            builder: (context, snapshot) {
+              final histories = snapshot.data ?? const <String>[];
+              if (histories.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final history in histories)
+                      ActionChip(
+                        avatar: const Icon(Icons.history, size: 16),
+                        label: Text(history),
+                        onPressed: () => onSuggestionSelected(history),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
       ],
     );
   }
+}
+
+class _PriceFilterSheet extends StatefulWidget {
+  const _PriceFilterSheet({
+    required this.minPrice,
+    required this.maxPrice,
+  });
+
+  final double? minPrice;
+  final double? maxPrice;
+
+  @override
+  State<_PriceFilterSheet> createState() => _PriceFilterSheetState();
+}
+
+class _PriceFilterSheetState extends State<_PriceFilterSheet> {
+  late RangeValues _values;
+
+  @override
+  void initState() {
+    super.initState();
+    _values = RangeValues(
+      widget.minPrice ?? 0,
+      widget.maxPrice ?? 50000000,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Loc theo gia', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          Text('${formatVnd(_values.start)} - ${formatVnd(_values.end)}'),
+          RangeSlider(
+            min: 0,
+            max: 50000000,
+            divisions: 100,
+            values: _values,
+            labels: RangeLabels(
+              formatVnd(_values.start),
+              formatVnd(_values.end),
+            ),
+            onChanged: (value) => setState(() => _values = value),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(
+                      const _PriceFilterResult(
+                        minPrice: null,
+                        maxPrice: null,
+                      ),
+                    );
+                  },
+                  child: const Text('Xoa loc'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(
+                      _PriceFilterResult(
+                        minPrice: _values.start,
+                        maxPrice: _values.end,
+                      ),
+                    );
+                  },
+                  child: const Text('Ap dung'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PriceFilterResult {
+  const _PriceFilterResult({
+    required this.minPrice,
+    required this.maxPrice,
+  });
+
+  final double? minPrice;
+  final double? maxPrice;
 }
 
 class _PromoBanner extends StatelessWidget {
@@ -163,7 +488,7 @@ class _PromoBanner extends StatelessWidget {
             child: Transform.rotate(
               angle: -0.16,
               child: const Text(
-                'AUTO',
+                'Shopping',
                 style: TextStyle(
                   color: Color(0x22FFFFFF),
                   fontSize: 54,
@@ -178,7 +503,7 @@ class _PromoBanner extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Text(
-                'SAN XE TOT',
+                'SIÊU SĂN SALE - NGÀY ĐÔI ĐẾN RỒI!',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
@@ -187,7 +512,7 @@ class _PromoBanner extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Tim xe mo uoc',
+                'TOP ĐỒ CÔNG NGHỆ - DẪN ĐẦU XU HƯỚNG 2026',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 30,
@@ -195,7 +520,7 @@ class _PromoBanner extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Hang ngan tin dang moi va dang tin cay',
+                'Giảm chạm sàn đến 50%',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -211,7 +536,7 @@ class _PromoBanner extends StatelessWidget {
                   minimumSize: const Size(60, 34),
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                 ),
-                child: const Text('Kham pha'),
+                child: const Text('MUA NGAY'),
               ),
             ],
           ),
@@ -441,5 +766,5 @@ class _MessagePanel extends StatelessWidget {
 }
 
 String _formatCurrency(double value) {
-  return '${value.toStringAsFixed(value >= 100 ? 0 : 2)} d';
+  return formatVnd(value);
 }

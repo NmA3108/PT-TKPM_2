@@ -5,10 +5,15 @@ class ProductModel {
     required this.price,
     required this.rating,
     required this.imageUrl,
+    this.imageUrls = const [],
     this.salePrice,
     this.brand,
     this.categoryId,
     this.categoryName,
+    this.classificationId,
+    this.classificationName,
+    this.classifications = const [],
+    this.sizes = const [],
     this.sellerId,
     this.shopId,
     this.stock = 0,
@@ -22,9 +27,14 @@ class ProductModel {
   final double? salePrice;
   final double rating;
   final String imageUrl;
+  final List<String> imageUrls;
   final String? brand;
   final String? categoryId;
   final String? categoryName;
+  final String? classificationId;
+  final String? classificationName;
+  final List<String> classifications;
+  final List<String> sizes;
   final String? sellerId;
   final String? shopId;
   final int stock;
@@ -41,9 +51,14 @@ class ProductModel {
       salePrice: _readNullableDouble(json, ['salePrice', 'discountPrice']),
       rating: _readDouble(json, ['ratingAverage', 'rating', 'stars']),
       imageUrl: _readImageUrl(json),
+      imageUrls: _readImageUrls(json),
       brand: _readNullableString(json, ['brand', 'brandName']),
       categoryId: _readNullableString(json, ['categoryId']),
       categoryName: _readNullableString(json, ['categoryName', 'category']),
+      classificationId: _readNullableString(json, ['classificationId']),
+      classificationName: _readNullableString(json, ['classificationName']),
+      classifications: _readClassifications(json),
+      sizes: _readStringList(json, ['sizes', 'sizeOptions']),
       sellerId: _readNullableString(json, ['sellerId']),
       shopId: _readNullableString(json, ['shopId']),
       stock: _readInt(json, ['stock', 'quantity']),
@@ -84,9 +99,14 @@ class ProductModel {
       'salePrice': salePrice,
       'rating': rating,
       'imageUrl': imageUrl,
+      'imageUrls': imageUrls,
       'brand': brand,
       'categoryId': categoryId,
       'categoryName': categoryName,
+      'classificationId': classificationId,
+      'classificationName': classificationName,
+      'classifications': classifications,
+      'sizes': sizes,
       'sellerId': sellerId,
       'shopId': shopId,
       'stock': stock,
@@ -171,5 +191,61 @@ class ProductModel {
     }
 
     return '';
+  }
+
+  static List<String> _readImageUrls(Map<dynamic, dynamic> json) {
+    final images = <String>[];
+    final thumbnail = _readNullableString(json, [
+      'thumbnailUrl',
+      'imageUrl',
+      'image',
+    ]);
+    if (thumbnail != null) {
+      images.add(thumbnail);
+    }
+
+    final imageUrls = json['imageUrls'];
+    if (imageUrls is Map) {
+      images.addAll(imageUrls.values.map((value) => value.toString()));
+    } else if (imageUrls is List) {
+      images.addAll(imageUrls.map((value) => value.toString()));
+    }
+
+    return images
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  static List<String> _readStringList(
+    Map<dynamic, dynamic> json,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is List) {
+        return value
+            .map((item) => item.toString().trim())
+            .where((item) => item.isNotEmpty)
+            .toList();
+      }
+      if (value is Map) {
+        return value.values
+            .map((item) => item.toString().trim())
+            .where((item) => item.isNotEmpty)
+            .toList();
+      }
+    }
+    return const [];
+  }
+
+  static List<String> _readClassifications(Map<dynamic, dynamic> json) {
+    final values = _readStringList(json, ['classifications', 'variants']);
+    if (values.isNotEmpty) {
+      return values;
+    }
+    final classificationName = _readNullableString(json, ['classificationName']);
+    return classificationName == null ? const [] : [classificationName];
   }
 }

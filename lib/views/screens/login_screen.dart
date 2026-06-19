@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showError(String? message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message ?? 'Dang nhap that bai.')),
+      SnackBar(content: Text(message ?? 'Đăng nhập thất bại.')),
     );
   }
 
@@ -72,8 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   _AuthHero(
                     icon: Icons.storefront_outlined,
-                    title: 'Dang nhap',
-                    subtitle: 'Tiep tuc mua sam voi tai khoan cua ban',
+                    title: 'Đăng nhập',
+                    subtitle: 'Tiếp tục mua sắm với tài khoản của bạn',
                   ),
                   const SizedBox(height: 28),
                   _AuthCard(
@@ -84,13 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           TextFormField(
                             controller: _mobileController,
-                            keyboardType: TextInputType.phone,
+                            keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
-                              labelText: 'So dien thoai',
-                              prefixIcon: Icon(Icons.phone_outlined),
+                              labelText: 'Số điện thoại hoặc email',
+                              prefixIcon: Icon(Icons.alternate_email_outlined),
                             ),
-                            validator: _validateMobileNumber,
+                            validator: _validateLoginIdentifier,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
-                              labelText: 'Mat khau',
+                              labelText: 'Mật khẩu',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 onPressed: () {
@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 24),
                           _LoadingFilledButton(
                             isLoading: isLoading,
-                            label: 'Dang nhap',
+                            label: 'Đăng nhập',
                             onPressed: _submit,
                           ),
                         ],
@@ -137,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             );
                           },
-                    child: const Text('Chua co tai khoan? Dang ky ngay'),
+                    child: const Text('Chưa có tài khoản? Đăng ký ngay'),
                   ),
                 ],
               ),
@@ -148,16 +148,16 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  String? _validateMobileNumber(String? value) {
+  String? _validateLoginIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Vui long nhap so dien thoai.';
+      return 'Vui long nhap so dien thoai hoac email.';
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.length < 6) {
-      return 'Mat khau phai co it nhat 6 ky tu.';
+      return 'Mật khẩu phải có ít nhất 6 ký tự.';
     }
     return null;
   }
@@ -260,3 +260,4 @@ class _LoadingFilledButton extends StatelessWidget {
     );
   }
 }
+

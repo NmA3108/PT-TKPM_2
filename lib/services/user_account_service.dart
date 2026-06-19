@@ -1,33 +1,25 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_account_models.dart';
 
-const realtimeDatabaseUrl =
-    'https://tmdt-e5958-default-rtdb.asia-southeast1.firebasedatabase.app/';
-
 class UserAccountService {
-  UserAccountService({FirebaseDatabase? database})
-      : _database = database ??
-            FirebaseDatabase.instanceFor(
-              app: Firebase.app(),
-              databaseURL: realtimeDatabaseUrl,
-            );
+  UserAccountService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  final FirebaseDatabase _database;
+  final FirebaseFirestore _firestore;
 
-  DatabaseReference _profileRef(String uid) {
-    return _database.ref('users/$uid/profile');
+  DocumentReference<Map<String, dynamic>> _userRef(String uid) {
+    return _firestore.collection('users').doc(uid);
   }
 
-  DatabaseReference _addressesRef(String uid) {
-    return _database.ref('users/$uid/addresses');
+  CollectionReference<Map<String, dynamic>> _addressesRef(String uid) {
+    return _userRef(uid).collection('addresses');
   }
 
   Stream<UserProfileModel> watchProfile(String uid) {
-    return _profileRef(uid).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is Map<dynamic, dynamic>) {
+    return _userRef(uid).snapshots().map((snapshot) {
+      final value = snapshot.data();
+      if (value != null) {
         return UserProfileModel.fromMap(value);
       }
       return const UserProfileModel(fullName: '', phoneNumber: '', email: '');
@@ -38,42 +30,32 @@ class UserAccountService {
     required String uid,
     required UserProfileModel profile,
   }) async {
-    await _profileRef(uid).update(profile.toMap());
+    await _userRef(uid).set(profile.toMap(), SetOptions(merge: true));
   }
 
   Stream<List<UserAddressModel>> watchAddresses(String uid) {
-    return _addressesRef(uid).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value is! Map<dynamic, dynamic>) {
-        return <UserAddressModel>[];
-      }
-
-      final addresses = <UserAddressModel>[];
-      for (final entry in value.entries) {
-        final addressValue = entry.value;
-        if (addressValue is Map<dynamic, dynamic>) {
-          addresses.add(
-            UserAddressModel.fromMap(entry.key.toString(), addressValue),
-          );
-        }
-      }
-
-      return addresses.reversed.toList();
+    return _addressesRef(uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => UserAddressModel.fromMap(doc.id, doc.data()))
+          .toList();
     });
   }
 
-  Future<void> addAddress({
+  Future<String> addAddress({
     required String uid,
     required UserAddressModel address,
   }) async {
-    final newAddressRef = _addressesRef(uid).push();
-    await newAddressRef.set(address.toMap());
+    final ref = await _addressesRef(uid).add(address.toMap());
+    return ref.id;
   }
 
   Future<void> deleteAddress({
     required String uid,
     required String addressId,
   }) async {
-    await _addressesRef(uid).child(addressId).remove();
+    await _addressesRef(uid).doc(addressId).delete();
   }
 }

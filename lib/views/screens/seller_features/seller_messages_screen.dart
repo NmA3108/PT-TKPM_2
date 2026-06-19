@@ -58,7 +58,7 @@ class SellerMessagesScreen extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) => SellerCustomerChatScreen(
                             sellerId: sellerId,
-                            sellerName: seller?.fullName ?? 'Seller',
+                            sellerName: seller?.displayName ?? 'Seller000',
                             customerId: conversation.customerId,
                             customerName: conversation.customerName,
                           ),
